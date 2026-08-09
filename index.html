@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050914" />
+    <title>Serpent — Neon Snake</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css?v=mobile-touch-1" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <div class="ambient ambient-one"></div>
+      <div class="ambient ambient-two"></div>
+
+      <header class="topbar">
+        <a class="brand" href="." aria-label="Serpent home">
+          <span class="brand-mark"><i></i><i></i><i></i></span>
+          <span>SERPENT</span>
+        </a>
+        <div class="topbar-right">
+          <span class="live-dot"></span>
+          <span class="system-label">ARCADE PROTOCOL</span>
+        </div>
+      </header>
+
+      <section class="hero-copy" aria-labelledby="game-title">
+        <p class="eyebrow">THE MODERN CLASSIC</p>
+        <h1 id="game-title">Feed the <em>future.</em></h1>
+        <p class="subtitle">Thread your way through a glowing digital garden. Every fruit makes the pulse faster.</p>
+      </section>
+
+      <section class="game-layout" aria-label="Snake game">
+        <aside class="stat-rail" aria-label="Game statistics">
+          <div class="stat-card score-card">
+            <span class="stat-label">SCORE</span>
+            <strong id="score">000</strong>
+            <span class="stat-detail" id="score-detail">FIND THE FIRST ORB</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">BEST RUN</span>
+            <strong id="high-score">000</strong>
+            <span class="stat-detail">LOCAL RECORD</span>
+          </div>
+          <div class="stat-card level-card">
+            <span class="stat-label">VELOCITY</span>
+            <div class="level-row"><strong id="level">01</strong><span id="speed-name">FLOW</span></div>
+            <div class="meter" aria-hidden="true"><i id="speed-meter"></i></div>
+          </div>
+        </aside>
+
+        <div class="game-stage">
+          <div class="board-corner corner-tl"></div><div class="board-corner corner-tr"></div>
+          <div class="board-corner corner-bl"></div><div class="board-corner corner-br"></div>
+          <canvas id="game" width="800" height="800" aria-label="Snake game board"></canvas>
+          <div class="scanline" aria-hidden="true"></div>
+
+          <div class="game-overlay" id="start-overlay">
+            <div class="overlay-orb"></div>
+            <p class="overlay-kicker">SYSTEM READY</p>
+            <h2>Enter the garden</h2>
+            <p class="overlay-text">Guide the serpent with the direction pad or a swipe. Collect solar fruit. Never touch the perimeter—or yourself.</p>
+            <button class="primary-button" id="start-button"><span>Start run</span><kbd>SPACE</kbd></button>
+            <p class="control-hint"><span>SWIPE OR USE THE DIRECTION PAD</span></p>
+          </div>
+
+          <div class="game-overlay hidden" id="pause-overlay">
+            <p class="overlay-kicker">SIGNAL HELD</p>
+            <h2>Paused</h2>
+            <p class="overlay-text">Take a breath. The garden is holding its pulse.</p>
+            <button class="primary-button" id="resume-button"><span>Resume run</span><kbd>SPACE</kbd></button>
+          </div>
+
+          <div class="game-overlay hidden" id="gameover-overlay">
+            <p class="overlay-kicker failure">RUN TERMINATED</p>
+            <h2>Beautiful chaos.</h2>
+            <p class="overlay-text" id="gameover-message">You gathered 0 solar fruit.</p>
+            <button class="primary-button" id="restart-button"><span>Run it back</span><kbd>R</kbd></button>
+          </div>
+          </div>
+
+          <section class="touch-controls" aria-label="Touch controls">
+            <p class="touch-label">TOUCH CONTROLS</p>
+            <div class="direction-pad" role="group" aria-label="Move the snake">
+              <button class="direction-button direction-up" type="button" data-direction="up" aria-label="Move up">↑</button>
+              <button class="direction-button direction-left" type="button" data-direction="left" aria-label="Move left">←</button>
+              <button class="direction-button direction-down" type="button" data-direction="down" aria-label="Move down">↓</button>
+              <button class="direction-button direction-right" type="button" data-direction="right" aria-label="Move right">→</button>
+            </div>
+            <p class="touch-note">SWIPE ON THE BOARD OR TAP A DIRECTION</p>
+          </section>
+
+        <aside class="info-rail" aria-label="Controls and status">
+          <div class="guide-card">
+            <span class="stat-label">NAVIGATION</span>
+            <div class="key-grid" aria-hidden="true">
+              <i></i><b>↑</b><i></i>
+              <b>←</b><b>↓</b><b>→</b>
+            </div>
+            <span class="stat-detail">OR W A S D</span>
+          </div>
+          <div class="guide-card fruit-card">
+            <span class="fruit-sample"><i></i></span>
+            <div><span class="stat-label">SOLAR FRUIT</span><span class="stat-detail">+10 ENERGY</span></div>
+          </div>
+          <button class="secondary-button" id="pause-button" disabled><span class="pause-icon">Ⅱ</span><span>PAUSE</span><kbd>P</kbd></button>
+        </aside>
+      </section>
+
+      <footer>
+        <span>© 2026 SERPENT SYSTEMS</span>
+        <span class="footer-center"><i></i> ALL SYSTEMS NOMINAL</span>
+        <span>HIGH-FIDELITY ARCADE</span>
+      </footer>
+    </main>
+    <script src="game.js?v=mobile-touch-1"></script>
+  </body>
+</html>

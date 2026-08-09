@@ -1,0 +1,275 @@
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const highScoreEl = document.getElementById('high-score');
+const levelEl = document.getElementById('level');
+const speedNameEl = document.getElementById('speed-name');
+const speedMeter = document.getElementById('speed-meter');
+const scoreDetail = document.getElementById('score-detail');
+const startOverlay = document.getElementById('start-overlay');
+const pauseOverlay = document.getElementById('pause-overlay');
+const gameoverOverlay = document.getElementById('gameover-overlay');
+const gameoverMessage = document.getElementById('gameover-message');
+const pauseButton = document.getElementById('pause-button');
+
+const SIZE = 800;
+const CELLS = 20;
+const CELL = SIZE / CELLS;
+const directions = {
+  ArrowUp: { x: 0, y: -1 }, w: { x: 0, y: -1 }, W: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 }, s: { x: 0, y: 1 }, S: { x: 0, y: 1 },
+  ArrowLeft: { x: -1, y: 0 }, a: { x: -1, y: 0 }, A: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 }, d: { x: 1, y: 0 }, D: { x: 1, y: 0 }
+};
+const speedLabels = ['FLOW', 'PULSE', 'SURGE', 'HYPER', 'NOVA', 'LUDICROUS'];
+
+let snake, previousSnake, direction, queuedDirection, food, score, running, paused, gameOver;
+let lastMove = 0, animationFrame, particles = [], ripples = [], stars = [], highScore = 0, audioCtx, runId = 0;
+
+try { highScore = Number(localStorage.getItem('serpent-high-score')) || 0; } catch { /* storage is optional */ }
+highScoreEl.textContent = String(highScore).padStart(3, '0');
+
+function createStars() {
+  stars = Array.from({ length: 100 }, () => ({
+    x: Math.random() * SIZE, y: Math.random() * SIZE, r: Math.random() * 1.5 + .2,
+    phase: Math.random() * Math.PI * 2, tone: Math.random() > .82 ? '203, 175, 255' : '141, 217, 255'
+  }));
+}
+
+function resetGame() {
+  snake = [{ x: 10, y: 12 }, { x: 9, y: 12 }, { x: 8, y: 12 }, { x: 7, y: 12 }];
+  previousSnake = snake.map(segment => ({ ...segment }));
+  direction = { x: 1, y: 0 };
+  queuedDirection = { ...direction };
+  score = 0;
+  particles = [];
+  ripples = [];
+  food = spawnFood();
+  updateHud();
+}
+
+function spawnFood() {
+  const openCells = [];
+  for (let x = 1; x < CELLS - 1; x++) {
+    for (let y = 1; y < CELLS - 1; y++) {
+      if (!snake.some(s => s.x === x && s.y === y)) openCells.push({ x, y });
+    }
+  }
+  return openCells[Math.floor(Math.random() * openCells.length)];
+}
+
+function startGame() {
+  cancelAnimationFrame(animationFrame);
+  runId += 1;
+  resetGame();
+  running = true;
+  paused = false;
+  gameOver = false;
+  lastMove = performance.now();
+  startOverlay.classList.add('hidden');
+  pauseOverlay.classList.add('hidden');
+  gameoverOverlay.classList.add('hidden');
+  pauseButton.disabled = false;
+  animate(performance.now());
+  playTone(220, .035, 'sine');
+}
+
+function togglePause() {
+  if (!running || gameOver) return;
+  paused = !paused;
+  pauseOverlay.classList.toggle('hidden', !paused);
+  pauseButton.innerHTML = paused ? '<span class="pause-icon">▶</span><span>RESUME</span><kbd>P</kbd>' : '<span class="pause-icon">Ⅱ</span><span>PAUSE</span><kbd>P</kbd>';
+  if (!paused) { lastMove = performance.now(); animate(lastMove); }
+}
+
+function setDirection(next) {
+  if (!running || paused || gameOver) return;
+  if (next.x === -direction.x && next.y === -direction.y) return;
+  queuedDirection = next;
+}
+
+function move() {
+  direction = queuedDirection;
+  previousSnake = snake.map(segment => ({ ...segment }));
+  const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+  if (head.x < 0 || head.x >= CELLS || head.y < 0 || head.y >= CELLS || snake.some(part => part.x === head.x && part.y === head.y)) {
+    endGame();
+    return;
+  }
+  snake.unshift(head);
+  if (head.x === food.x && head.y === food.y) {
+    score += 10;
+    makeBurst((head.x + .5) * CELL, (head.y + .5) * CELL, '#ff9a8d', 22);
+    ripples.push({ x: (head.x + .5) * CELL, y: (head.y + .5) * CELL, age: 0, hue: 337 });
+    food = spawnFood();
+    updateHud();
+    playTone(380 + score * 1.5, .055, 'triangle');
+  } else {
+    snake.pop();
+  }
+}
+
+function endGame() {
+  running = false;
+  gameOver = true;
+  pauseButton.disabled = true;
+  makeBurst((snake[0].x + .5) * CELL, (snake[0].y + .5) * CELL, '#a783ff', 55);
+  const endedRun = runId;
+  setTimeout(() => {
+    if (endedRun === runId && gameOver) gameoverOverlay.classList.remove('hidden');
+  }, 390);
+  const fruitCount = score / 10;
+  gameoverMessage.textContent = `You gathered ${fruitCount} solar fruit${fruitCount === 1 ? '' : 's'} and reached level ${String(getLevel()).padStart(2, '0')}.`;
+  if (score > highScore) {
+    highScore = score;
+    highScoreEl.textContent = String(highScore).padStart(3, '0');
+    try { localStorage.setItem('serpent-high-score', highScore); } catch { /* storage is optional */ }
+  }
+  playTone(110, .18, 'sawtooth');
+  setTimeout(() => playTone(73, .25, 'sawtooth'), 100);
+}
+
+function getLevel() { return Math.min(12, 1 + Math.floor(score / 40)); }
+function getMoveDelay() { return Math.max(54, 130 - (getLevel() - 1) * 7); }
+
+function updateHud() {
+  const level = getLevel();
+  scoreEl.textContent = String(score).padStart(3, '0');
+  levelEl.textContent = String(level).padStart(2, '0');
+  speedNameEl.textContent = speedLabels[Math.min(speedLabels.length - 1, Math.floor((level - 1) / 2))];
+  speedMeter.style.width = `${Math.min(100, 12 + (level - 1) * 8)}%`;
+  scoreDetail.textContent = score ? `${snake.length} SEGMENTS SYNCHRONIZED` : 'FIND THE FIRST ORB';
+}
+
+function roundedRect(x, y, w, h, radius) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, radius);
+}
+
+function drawBackground(time) {
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  const backdrop = ctx.createRadialGradient(SIZE * .5, SIZE * .43, 0, SIZE * .5, SIZE * .47, SIZE * .73);
+  backdrop.addColorStop(0, '#0d2140');
+  backdrop.addColorStop(.56, '#08172d');
+  backdrop.addColorStop(1, '#040914');
+  ctx.fillStyle = backdrop;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  for (const star of stars) {
+    const flicker = .22 + (Math.sin(time * .0016 + star.phase) + 1) * .16;
+    ctx.fillStyle = `rgba(${star.tone}, ${flicker})`;
+    ctx.beginPath(); ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= CELLS; i++) {
+    const pos = i * CELL;
+    ctx.strokeStyle = i % 5 === 0 ? 'rgba(136, 197, 255, .12)' : 'rgba(136, 197, 255, .055)';
+    ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, SIZE); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, pos); ctx.lineTo(SIZE, pos); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(85, 243, 213, .55)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+}
+
+function drawFood(time) {
+  const x = (food.x + .5) * CELL, y = (food.y + .5) * CELL;
+  const pulse = 1 + Math.sin(time * .005) * .1;
+  const aura = ctx.createRadialGradient(x, y, 0, x, y, CELL * 1.45 * pulse);
+  aura.addColorStop(0, 'rgba(255, 242, 184, .4)'); aura.addColorStop(.25, 'rgba(255, 90, 132, .24)'); aura.addColorStop(1, 'rgba(255, 71, 158, 0)');
+  ctx.fillStyle = aura; ctx.fillRect(x - CELL * 1.5, y - CELL * 1.5, CELL * 3, CELL * 3);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(time * .0012);
+  for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.fillStyle = i % 2 ? '#ff8293' : '#ffd488'; ctx.globalAlpha = .77; ctx.beginPath(); ctx.ellipse(0, -CELL * .27, CELL * .09, CELL * .2, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+  const core = ctx.createRadialGradient(x - 4, y - 5, 1, x, y, 14); core.addColorStop(0, '#fffef1'); core.addColorStop(.22, '#fff4b7'); core.addColorStop(.58, '#ff887d'); core.addColorStop(1, '#ef477b');
+  ctx.fillStyle = core; ctx.beginPath(); ctx.arc(x, y, 13 * pulse, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawSnake(interpolation, time) {
+  const segments = snake.map((current, index) => {
+    const previous = previousSnake[index] || previousSnake[previousSnake.length - 1] || current;
+    return { x: (previous.x + (current.x - previous.x) * interpolation + .5) * CELL, y: (previous.y + (current.y - previous.y) * interpolation + .5) * CELL, index };
+  });
+  if (!segments.length) return;
+  ctx.save();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let i = segments.length - 1; i > 0; i--) {
+    const a = segments[i], b = segments[i - 1];
+    const width = Math.max(15, CELL * (.66 - Math.min(i, 11) * .014));
+    const trail = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+    trail.addColorStop(0, `hsla(${248 - i * 1.8}, 73%, ${47 + Math.min(i, 8)}%, .78)`);
+    trail.addColorStop(1, 'hsla(166, 88%, 66%, .96)');
+    ctx.strokeStyle = trail; ctx.lineWidth = width; ctx.shadowBlur = 13; ctx.shadowColor = i < 5 ? '#4ef1d6' : '#7d74e6';
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const s = segments[i]; const r = Math.max(7, CELL * (.30 - Math.min(i, 12) * .006));
+    const grad = ctx.createRadialGradient(s.x - r * .3, s.y - r * .4, 1, s.x, s.y, r * 1.2);
+    grad.addColorStop(0, i === 0 ? '#edffff' : '#b5ffe8'); grad.addColorStop(.25, i === 0 ? '#73ffdd' : '#57dcbf'); grad.addColorStop(1, i === 0 ? '#3478bd' : '#4b53ad');
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
+    if (i % 2 === 0 && i > 1) { ctx.fillStyle = 'rgba(232,255,252,.36)'; ctx.beginPath(); ctx.arc(s.x - r * .2, s.y - r * .28, r * .16, 0, Math.PI * 2); ctx.fill(); }
+  }
+  const head = segments[0];
+  const ex = direction.x, ey = direction.y, sx = -direction.y, sy = direction.x;
+  for (const side of [-1, 1]) {
+    const eyeX = head.x + ex * 7 + sx * side * 7, eyeY = head.y + ey * 7 + sy * side * 7;
+    ctx.fillStyle = '#071123'; ctx.beginPath(); ctx.arc(eyeX, eyeY, 4.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c8fffd'; ctx.beginPath(); ctx.arc(eyeX + ex * 1.2, eyeY + ey * 1.2, 1.35, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function makeBurst(x, y, color, count) {
+  for (let i = 0; i < count; i++) { const angle = Math.random() * Math.PI * 2, velocity = 1.2 + Math.random() * 5; particles.push({ x, y, vx: Math.cos(angle) * velocity, vy: Math.sin(angle) * velocity, life: 1, size: 1 + Math.random() * 3, color }); }
+}
+function drawEffects() {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  particles = particles.filter(p => p.life > .02);
+  for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vx *= .96; p.vy *= .96; p.life *= .95; ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill(); }
+  ripples = ripples.filter(r => r.age < 1);
+  for (const r of ripples) { r.age += .023; ctx.globalAlpha = 1 - r.age; ctx.strokeStyle = `hsla(${r.hue}, 95%, 72%, .85)`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(r.x, r.y, 10 + r.age * 45, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.restore();
+}
+
+function animate(time) {
+  const elapsed = time - lastMove;
+  if (running && !paused && elapsed >= getMoveDelay()) { move(); lastMove = time; }
+  drawBackground(time);
+  drawFood(time);
+  drawSnake(running && !paused ? Math.min(1, elapsed / getMoveDelay()) : 1, time);
+  drawEffects();
+  if (running || particles.length) animationFrame = requestAnimationFrame(animate);
+}
+
+function playTone(frequency, duration, type) {
+  try {
+    audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    oscillator.type = type; oscillator.frequency.value = frequency; gain.gain.setValueAtTime(.035, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + duration);
+    oscillator.connect(gain).connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + duration);
+  } catch { /* audio is an enhancement */ }
+}
+
+document.addEventListener('keydown', event => {
+  if (event.code === 'Space') { event.preventDefault(); if (!running || gameOver) startGame(); else togglePause(); return; }
+  if (event.key === 'p' || event.key === 'P') { togglePause(); return; }
+  if (event.key === 'r' || event.key === 'R') { startGame(); return; }
+  if (directions[event.key]) { event.preventDefault(); setDirection(directions[event.key]); }
+});
+document.getElementById('start-button').addEventListener('click', startGame);
+document.getElementById('restart-button').addEventListener('click', startGame);
+document.getElementById('resume-button').addEventListener('click', togglePause);
+pauseButton.addEventListener('click', togglePause);
+let touchStart;
+canvas.addEventListener('pointerdown', event => { touchStart = { x: event.clientX, y: event.clientY }; });
+canvas.addEventListener('pointerup', event => {
+  if (!touchStart) return;
+  const dx = event.clientX - touchStart.x, dy = event.clientY - touchStart.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) > 22) setDirection(Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) });
+  touchStart = null;
+});
+
+createStars();
+resetGame();
+drawBackground(0); drawFood(0); drawSnake(1, 0);

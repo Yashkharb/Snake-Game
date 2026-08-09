@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050914" />
-    <title> Serpent — Neon Snake Game </title>
+    <title>Serpent — Neon Snake</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=mobile-touch-1" />
   </head>
   <body>
     <main class="app-shell">
@@ -61,9 +61,9 @@
             <div class="overlay-orb"></div>
             <p class="overlay-kicker">SYSTEM READY</p>
             <h2>Enter the garden</h2>
-            <p class="overlay-text">Guide the serpent. Collect solar fruit. Never touch the perimeter—or yourself.</p>
+            <p class="overlay-text">Guide the serpent with the direction pad or a swipe. Collect solar fruit. Never touch the perimeter—or yourself.</p>
             <button class="primary-button" id="start-button"><span>Start run</span><kbd>SPACE</kbd></button>
-            <p class="control-hint"><span>ARROWS / WASD</span> TO NAVIGATE</p>
+            <p class="control-hint"><span>SWIPE OR USE THE DIRECTION PAD</span></p>
           </div>
 
           <div class="game-overlay hidden" id="pause-overlay">
@@ -79,7 +79,18 @@
             <p class="overlay-text" id="gameover-message">You gathered 0 solar fruit.</p>
             <button class="primary-button" id="restart-button"><span>Run it back</span><kbd>R</kbd></button>
           </div>
-        </div>
+          </div>
+
+          <section class="touch-controls" aria-label="Touch controls">
+            <p class="touch-label">TOUCH CONTROLS</p>
+            <div class="direction-pad" role="group" aria-label="Move the snake">
+              <button class="direction-button direction-up" type="button" data-direction="up" aria-label="Move up">↑</button>
+              <button class="direction-button direction-left" type="button" data-direction="left" aria-label="Move left">←</button>
+              <button class="direction-button direction-down" type="button" data-direction="down" aria-label="Move down">↓</button>
+              <button class="direction-button direction-right" type="button" data-direction="right" aria-label="Move right">→</button>
+            </div>
+            <p class="touch-note">SWIPE ON THE BOARD OR TAP A DIRECTION</p>
+          </section>
 
         <aside class="info-rail" aria-label="Controls and status">
           <div class="guide-card">
@@ -104,6 +115,6 @@
         <span>HIGH-FIDELITY ARCADE</span>
       </footer>
     </main>
-    <script src="game.js"></script>
+    <script src="game.js?v=mobile-touch-1"></script>
   </body>
 </html>

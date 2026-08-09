@@ -23,7 +23,7 @@ const directions = {
 };
 const speedLabels = ['FLOW', 'PULSE', 'SURGE', 'HYPER', 'NOVA', 'LUDICROUS'];
 
-let snake, previousSnake, direction, queuedDirection, food, score, running, paused, gameOver;
+let snake, direction, turnQueue, food, score, running, paused, gameOver;
 let lastMove = 0, animationFrame, particles = [], ripples = [], stars = [], highScore = 0, audioCtx, runId = 0;
 
 try { highScore = Number(localStorage.getItem('serpent-high-score')) || 0; } catch { /* storage is optional */ }
@@ -38,9 +38,8 @@ function createStars() {
 
 function resetGame() {
   snake = [{ x: 10, y: 12 }, { x: 9, y: 12 }, { x: 8, y: 12 }, { x: 7, y: 12 }];
-  previousSnake = snake.map(segment => ({ ...segment }));
   direction = { x: 1, y: 0 };
-  queuedDirection = { ...direction };
+  turnQueue = [];
   score = 0;
   particles = [];
   ripples = [];
@@ -62,10 +61,12 @@ function startGame() {
   cancelAnimationFrame(animationFrame);
   runId += 1;
   resetGame();
+  document.body.classList.add('is-playing');
   running = true;
   paused = false;
   gameOver = false;
-  lastMove = performance.now();
+  // Begin on the next frame, so tapping Start feels instant instead of delayed.
+  lastMove = performance.now() - getMoveDelay();
   startOverlay.classList.add('hidden');
   pauseOverlay.classList.add('hidden');
   gameoverOverlay.classList.add('hidden');
@@ -84,13 +85,15 @@ function togglePause() {
 
 function setDirection(next) {
   if (!running || paused || gameOver) return;
-  if (next.x === -direction.x && next.y === -direction.y) return;
-  queuedDirection = next;
+  const lastPlannedDirection = turnQueue[turnQueue.length - 1] || direction;
+  if ((next.x === lastPlannedDirection.x && next.y === lastPlannedDirection.y) ||
+      (next.x === -lastPlannedDirection.x && next.y === -lastPlannedDirection.y)) return;
+  // Keep a short input buffer: fast turns from a swipe or D-pad tap are never lost.
+  if (turnQueue.length < 2) turnQueue.push({ ...next });
 }
 
 function move() {
-  direction = queuedDirection;
-  previousSnake = snake.map(segment => ({ ...segment }));
+  direction = turnQueue.shift() || direction;
   const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
   if (head.x < 0 || head.x >= CELLS || head.y < 0 || head.y >= CELLS || snake.some(part => part.x === head.x && part.y === head.y)) {
     endGame();
@@ -130,7 +133,7 @@ function endGame() {
 }
 
 function getLevel() { return Math.min(12, 1 + Math.floor(score / 40)); }
-function getMoveDelay() { return Math.max(54, 130 - (getLevel() - 1) * 7); }
+function getMoveDelay() { return Math.max(50, 105 - (getLevel() - 1) * 6); }
 
 function updateHud() {
   const level = getLevel();
@@ -185,11 +188,12 @@ function drawFood(time) {
   ctx.fillStyle = core; ctx.beginPath(); ctx.arc(x, y, 13 * pulse, 0, Math.PI * 2); ctx.fill();
 }
 
-function drawSnake(interpolation, time) {
-  const segments = snake.map((current, index) => {
-    const previous = previousSnake[index] || previousSnake[previousSnake.length - 1] || current;
-    return { x: (previous.x + (current.x - previous.x) * interpolation + .5) * CELL, y: (previous.y + (current.y - previous.y) * interpolation + .5) * CELL, index };
-  });
+function drawSnake() {
+  // Render the current grid position. Interpolation made the snake appear to
+  // trail behind every turn, which felt like input lag.
+  const segments = snake.map((current, index) => ({
+    x: (current.x + .5) * CELL, y: (current.y + .5) * CELL, index
+  }));
   if (!segments.length) return;
   ctx.save();
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -234,10 +238,16 @@ function drawEffects() {
 
 function animate(time) {
   const elapsed = time - lastMove;
-  if (running && !paused && elapsed >= getMoveDelay()) { move(); lastMove = time; }
+  if (running && !paused && elapsed >= getMoveDelay()) {
+    const moveDelay = getMoveDelay();
+    move();
+    // Preserve the game rhythm instead of adding one frame of delay each move.
+    lastMove += moveDelay;
+    if (time - lastMove > moveDelay) lastMove = time;
+  }
   drawBackground(time);
   drawFood(time);
-  drawSnake(running && !paused ? Math.min(1, elapsed / getMoveDelay()) : 1, time);
+  drawSnake();
   drawEffects();
   if (running || particles.length) animationFrame = requestAnimationFrame(animate);
 }
@@ -261,15 +271,45 @@ document.getElementById('start-button').addEventListener('click', startGame);
 document.getElementById('restart-button').addEventListener('click', startGame);
 document.getElementById('resume-button').addEventListener('click', togglePause);
 pauseButton.addEventListener('click', togglePause);
-let touchStart;
-canvas.addEventListener('pointerdown', event => { touchStart = { x: event.clientX, y: event.clientY }; });
+const touchDirections = {
+  up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 }
+};
+let touchStart, activePointerId;
+
+function handleSwipe(event) {
+  if (!touchStart || event.pointerId !== activePointerId) return;
+  const dx = event.clientX - touchStart.x;
+  const dy = event.clientY - touchStart.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 16) return;
+  setDirection(Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) });
+  // One continuous gesture can steer through several turns without lifting.
+  touchStart = { x: event.clientX, y: event.clientY };
+}
+
+canvas.addEventListener('pointerdown', event => {
+  activePointerId = event.pointerId;
+  touchStart = { x: event.clientX, y: event.clientY };
+  canvas.setPointerCapture?.(event.pointerId);
+});
+canvas.addEventListener('pointermove', handleSwipe);
 canvas.addEventListener('pointerup', event => {
-  if (!touchStart) return;
-  const dx = event.clientX - touchStart.x, dy = event.clientY - touchStart.y;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) > 22) setDirection(Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) });
-  touchStart = null;
+  handleSwipe(event);
+  if (event.pointerId === activePointerId) { touchStart = undefined; activePointerId = undefined; }
+});
+canvas.addEventListener('pointercancel', () => { touchStart = undefined; activePointerId = undefined; });
+
+document.querySelectorAll('.direction-button').forEach(button => {
+  const applyDirection = event => {
+    event.preventDefault();
+    setDirection(touchDirections[button.dataset.direction]);
+  };
+  button.addEventListener('pointerdown', applyDirection);
+  button.addEventListener('click', event => {
+    // Pointer input has already been handled above; this preserves keyboard accessibility.
+    if (event.detail === 0) applyDirection(event);
+  });
 });
 
 createStars();
 resetGame();
-drawBackground(0); drawFood(0); drawSnake(1, 0);
+drawBackground(0); drawFood(0); drawSnake();

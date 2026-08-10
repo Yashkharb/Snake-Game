@@ -16,11 +16,13 @@ const SIZE = 800;
 const CELLS = 20;
 const CELL = SIZE / CELLS;
 const directions = {
-  ArrowUp: { x: 0, y: -1 }, w: { x: 0, y: -1 }, W: { x: 0, y: -1 },
-  ArrowDown: { x: 0, y: 1 }, s: { x: 0, y: 1 }, S: { x: 0, y: 1 },
-  ArrowLeft: { x: -1, y: 0 }, a: { x: -1, y: 0 }, A: { x: -1, y: 0 },
-  ArrowRight: { x: 1, y: 0 }, d: { x: 1, y: 0 }, D: { x: 1, y: 0 }
+  ArrowUp: { x: 0, y: -1 }, KeyW: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 }, KeyS: { x: 0, y: 1 },
+  ArrowLeft: { x: -1, y: 0 }, KeyA: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 }, KeyD: { x: 1, y: 0 }
 };
+const PAUSE_LABEL = '<span class="pause-icon">Ⅱ</span><span>PAUSE</span><kbd>P</kbd>';
+const RESUME_LABEL = '<span class="pause-icon">▶</span><span>RESUME</span><kbd>P</kbd>';
 const speedLabels = ['FLOW', 'PULSE', 'SURGE', 'HYPER', 'NOVA', 'LUDICROUS'];
 
 let snake, direction, turnQueue, food, score, running, paused, gameOver;
@@ -49,8 +51,8 @@ function resetGame() {
 
 function spawnFood() {
   const openCells = [];
-  for (let x = 1; x < CELLS - 1; x++) {
-    for (let y = 1; y < CELLS - 1; y++) {
+  for (let x = 0; x < CELLS; x++) {
+    for (let y = 0; y < CELLS; y++) {
       if (!snake.some(s => s.x === x && s.y === y)) openCells.push({ x, y });
     }
   }
@@ -61,10 +63,12 @@ function startGame() {
   cancelAnimationFrame(animationFrame);
   runId += 1;
   resetGame();
-  document.body.classList.add('is-playing');
+  // Drives the compact in-game layout; the start screen chrome never returns.
+  document.body.classList.add('is-started');
   running = true;
   paused = false;
   gameOver = false;
+  pauseButton.innerHTML = PAUSE_LABEL;
   // Begin on the next frame, so tapping Start feels instant instead of delayed.
   lastMove = performance.now() - getMoveDelay();
   startOverlay.classList.add('hidden');
@@ -79,8 +83,11 @@ function togglePause() {
   if (!running || gameOver) return;
   paused = !paused;
   pauseOverlay.classList.toggle('hidden', !paused);
-  pauseButton.innerHTML = paused ? '<span class="pause-icon">▶</span><span>RESUME</span><kbd>P</kbd>' : '<span class="pause-icon">Ⅱ</span><span>PAUSE</span><kbd>P</kbd>';
-  if (!paused) { lastMove = performance.now(); animate(lastMove); }
+  pauseButton.innerHTML = paused ? RESUME_LABEL : PAUSE_LABEL;
+  // Cancel first: a pending frame from the particle tail would otherwise leave
+  // two loops running for the rest of the session.
+  cancelAnimationFrame(animationFrame);
+  if (!paused) { lastMove = performance.now(); animationFrame = requestAnimationFrame(animate); }
 }
 
 function setDirection(next) {
@@ -95,39 +102,66 @@ function setDirection(next) {
 function move() {
   direction = turnQueue.shift() || direction;
   const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
-  if (head.x < 0 || head.x >= CELLS || head.y < 0 || head.y >= CELLS || snake.some(part => part.x === head.x && part.y === head.y)) {
+  const willGrow = head.x === food.x && head.y === food.y;
+  // The tail vacates its cell on this tick unless the snake grows, so following
+  // your own tail is a legal move.
+  const blocking = willGrow ? snake : snake.slice(0, -1);
+  if (head.x < 0 || head.x >= CELLS || head.y < 0 || head.y >= CELLS || blocking.some(part => part.x === head.x && part.y === head.y)) {
     endGame();
     return;
   }
   snake.unshift(head);
-  if (head.x === food.x && head.y === food.y) {
+  if (willGrow) {
     score += 10;
     makeBurst((head.x + .5) * CELL, (head.y + .5) * CELL, '#ff9a8d', 22);
     ripples.push({ x: (head.x + .5) * CELL, y: (head.y + .5) * CELL, age: 0, hue: 337 });
-    food = spawnFood();
+    const next = spawnFood();
     updateHud();
     playTone(380 + score * 1.5, .055, 'triangle');
+    if (!next) { winGame(); return; }
+    food = next;
   } else {
     snake.pop();
   }
 }
 
-function endGame() {
+function winGame() {
+  finishRun();
+  const kicker = gameoverOverlay.querySelector('.overlay-kicker');
+  kicker.textContent = 'GARDEN COMPLETE';
+  kicker.classList.remove('failure');
+  gameoverOverlay.querySelector('h2').textContent = 'Flawless.';
+  gameoverMessage.textContent = `Perfect run. Every cell of the garden is yours at ${String(score).padStart(3, '0')} points.`;
+  playTone(523, .12, 'triangle');
+  setTimeout(() => playTone(784, .2, 'triangle'), 130);
+}
+
+function finishRun() {
   running = false;
   gameOver = true;
   pauseButton.disabled = true;
   makeBurst((snake[0].x + .5) * CELL, (snake[0].y + .5) * CELL, '#a783ff', 55);
   const endedRun = runId;
   setTimeout(() => {
-    if (endedRun === runId && gameOver) gameoverOverlay.classList.remove('hidden');
+    if (endedRun !== runId || !gameOver) return;
+    gameoverOverlay.classList.remove('hidden');
+    document.getElementById('restart-button').focus();
   }, 390);
-  const fruitCount = score / 10;
-  gameoverMessage.textContent = `You gathered ${fruitCount} solar fruit${fruitCount === 1 ? '' : 's'} and reached level ${String(getLevel()).padStart(2, '0')}.`;
   if (score > highScore) {
     highScore = score;
     highScoreEl.textContent = String(highScore).padStart(3, '0');
-    try { localStorage.setItem('serpent-high-score', highScore); } catch { /* storage is optional */ }
+    try { localStorage.setItem('serpent-high-score', String(highScore)); } catch { /* storage is optional */ }
   }
+}
+
+function endGame() {
+  finishRun();
+  const kicker = gameoverOverlay.querySelector('.overlay-kicker');
+  kicker.textContent = 'RUN TERMINATED';
+  kicker.classList.add('failure');
+  gameoverOverlay.querySelector('h2').textContent = 'Beautiful chaos.';
+  const fruitCount = score / 10;
+  gameoverMessage.textContent = `You gathered ${fruitCount} solar fruit${fruitCount === 1 ? '' : 's'} and reached level ${String(getLevel()).padStart(2, '0')}.`;
   playTone(110, .18, 'sawtooth');
   setTimeout(() => playTone(73, .25, 'sawtooth'), 100);
 }
@@ -138,15 +172,11 @@ function getMoveDelay() { return Math.max(50, 105 - (getLevel() - 1) * 6); }
 function updateHud() {
   const level = getLevel();
   scoreEl.textContent = String(score).padStart(3, '0');
+  scoreEl.setAttribute('aria-label', `Score ${score}`);
   levelEl.textContent = String(level).padStart(2, '0');
   speedNameEl.textContent = speedLabels[Math.min(speedLabels.length - 1, Math.floor((level - 1) / 2))];
   speedMeter.style.width = `${Math.min(100, 12 + (level - 1) * 8)}%`;
   scoreDetail.textContent = score ? `${snake.length} SEGMENTS SYNCHRONIZED` : 'FIND THE FIRST ORB';
-}
-
-function roundedRect(x, y, w, h, radius) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, radius);
 }
 
 function drawBackground(time) {
@@ -249,7 +279,9 @@ function animate(time) {
   drawFood(time);
   drawSnake();
   drawEffects();
-  if (running || particles.length) animationFrame = requestAnimationFrame(animate);
+  // Stop the loop while paused; togglePause restarts it. Otherwise resuming
+  // would leave a second loop running for the rest of the session.
+  if ((running && !paused) || particles.length) animationFrame = requestAnimationFrame(animate);
 }
 
 function playTone(frequency, duration, type) {
@@ -263,9 +295,9 @@ function playTone(frequency, duration, type) {
 
 document.addEventListener('keydown', event => {
   if (event.code === 'Space') { event.preventDefault(); if (!running || gameOver) startGame(); else togglePause(); return; }
-  if (event.key === 'p' || event.key === 'P') { togglePause(); return; }
-  if (event.key === 'r' || event.key === 'R') { startGame(); return; }
-  if (directions[event.key]) { event.preventDefault(); setDirection(directions[event.key]); }
+  if (event.code === 'KeyP') { togglePause(); return; }
+  if (event.code === 'KeyR') { startGame(); return; }
+  if (directions[event.code]) { event.preventDefault(); setDirection(directions[event.code]); }
 });
 document.getElementById('start-button').addEventListener('click', startGame);
 document.getElementById('restart-button').addEventListener('click', startGame);

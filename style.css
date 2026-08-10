@@ -88,6 +88,11 @@ button { font-family: inherit; cursor: pointer; }.primary-button { display: inli
 footer { margin-top: clamp(28px, 5vh, 58px); color: #66768d; font-family: "DM Mono", monospace; font-size: 8px; letter-spacing: .1em; }.footer-center { display: flex; align-items: center; gap: 7px; }.footer-center i { width: 5px; height: 5px; background: #7cf0af; box-shadow: 0 0 8px #7cf0af; }
 @keyframes breathe { 50% { opacity: .4; box-shadow: 0 0 2px var(--cyan); } } @keyframes float { 50% { transform: translateY(-5px) scale(1.04); } }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .scanline { display: none; }
+}
+
 @media (max-width: 950px) { .game-layout { grid-template-columns: 135px minmax(350px, 610px); }.info-rail { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; }.guide-card, .secondary-button { min-height: auto; }.fruit-card { justify-content: center; }.key-grid { margin: 8px auto; } }
 @media (max-width: 650px) {
   .app-shell { padding: 19px 14px 17px; }
@@ -96,8 +101,8 @@ footer { margin-top: clamp(28px, 5vh, 58px); color: #66768d; font-family: "DM Mo
   .hero-copy { margin: 0 10px 24px; }
   .hero-copy h1 { font-size: 43px; }
   .subtitle { font-size: 14px; }
-  body:has(#start-overlay.hidden) .hero-copy { display: none; }
-  body:has(#start-overlay.hidden) .topbar { padding-bottom: 16px; }
+  body.is-started .hero-copy { display: none; }
+  body.is-started .topbar { padding-bottom: 16px; }
   .game-layout { grid-template-columns: 1fr; gap: 13px; }
   .stat-rail { display: grid; grid-template-columns: 1fr 1fr 1.1fr; grid-row: 1; gap: 8px; }
   .stat-card { min-height: 86px; padding: 12px 11px; }
@@ -145,6 +150,6 @@ footer { margin-top: clamp(28px, 5vh, 58px); color: #66768d; font-family: "DM Mo
   .fruit-card { min-height: 66px; gap: 7px; }
   .fruit-sample { width: 27px; height: 27px; }
   .secondary-button { min-height: 44px; padding: 0 9px; font-size: 9px; }
-  body:has(#start-overlay.hidden) .game-layout { grid-template-columns: 100px minmax(218px, min(56vh, calc(100vw - 278px))) 120px; }
-  body:has(#start-overlay.hidden) .touch-controls { display: flex; }
+  body.is-started .game-layout { grid-template-columns: 100px minmax(218px, min(56vh, calc(100vw - 278px))) 120px; }
+  body.is-started .touch-controls { display: flex; }
 }

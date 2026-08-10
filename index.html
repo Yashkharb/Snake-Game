@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=mobile-touch-1" />
+    <link rel="stylesheet" href="style.css?v=review-fixes-1" />
   </head>
   <body>
     <main class="app-shell">
@@ -36,7 +36,7 @@
         <aside class="stat-rail" aria-label="Game statistics">
           <div class="stat-card score-card">
             <span class="stat-label">SCORE</span>
-            <strong id="score">000</strong>
+            <strong id="score" role="status" aria-live="polite" aria-label="Score 0">000</strong>
             <span class="stat-detail" id="score-detail">FIND THE FIRST ORB</span>
           </div>
           <div class="stat-card">
@@ -79,18 +79,18 @@
             <p class="overlay-text" id="gameover-message">You gathered 0 solar fruit.</p>
             <button class="primary-button" id="restart-button"><span>Run it back</span><kbd>R</kbd></button>
           </div>
-          </div>
+        </div>
 
-          <section class="touch-controls" aria-label="Touch controls">
-            <p class="touch-label">TOUCH CONTROLS</p>
-            <div class="direction-pad" role="group" aria-label="Move the snake">
-              <button class="direction-button direction-up" type="button" data-direction="up" aria-label="Move up">↑</button>
-              <button class="direction-button direction-left" type="button" data-direction="left" aria-label="Move left">←</button>
-              <button class="direction-button direction-down" type="button" data-direction="down" aria-label="Move down">↓</button>
-              <button class="direction-button direction-right" type="button" data-direction="right" aria-label="Move right">→</button>
-            </div>
-            <p class="touch-note">SWIPE ON THE BOARD OR TAP A DIRECTION</p>
-          </section>
+        <section class="touch-controls" aria-label="Touch controls">
+          <p class="touch-label">TOUCH CONTROLS</p>
+          <div class="direction-pad" role="group" aria-label="Move the snake">
+            <button class="direction-button direction-up" type="button" data-direction="up" aria-label="Move up">↑</button>
+            <button class="direction-button direction-left" type="button" data-direction="left" aria-label="Move left">←</button>
+            <button class="direction-button direction-down" type="button" data-direction="down" aria-label="Move down">↓</button>
+            <button class="direction-button direction-right" type="button" data-direction="right" aria-label="Move right">→</button>
+          </div>
+          <p class="touch-note">SWIPE ON THE BOARD OR TAP A DIRECTION</p>
+        </section>
 
         <aside class="info-rail" aria-label="Controls and status">
           <div class="guide-card">
@@ -115,6 +115,6 @@
         <span>HIGH-FIDELITY ARCADE</span>
       </footer>
     </main>
-    <script src="game.js?v=mobile-touch-1"></script>
+    <script src="game.js?v=review-fixes-1"></script>
   </body>
 </html>

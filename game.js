@@ -1,16 +1,40 @@
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-const highScoreEl = document.getElementById('high-score');
-const levelEl = document.getElementById('level');
-const speedNameEl = document.getElementById('speed-name');
-const speedMeter = document.getElementById('speed-meter');
-const scoreDetail = document.getElementById('score-detail');
-const startOverlay = document.getElementById('start-overlay');
-const pauseOverlay = document.getElementById('pause-overlay');
-const gameoverOverlay = document.getElementById('gameover-overlay');
-const gameoverMessage = document.getElementById('gameover-message');
-const pauseButton = document.getElementById('pause-button');
+function requireElement(id) {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`missing required element #${id}`);
+  return element;
+}
+
+function reportFatalError(error) {
+  console.error('[serpent]', error);
+  const banner = document.querySelector('.fatal-error') || document.createElement('p');
+  banner.className = 'fatal-error';
+  banner.setAttribute('role', 'alert');
+  banner.textContent = `Serpent could not run: ${error instanceof Error ? error.message : String(error)}`;
+  document.body.append(banner);
+}
+
+let canvas, ctx, scoreEl, highScoreEl, levelEl, speedNameEl, speedMeter, scoreDetail;
+let startOverlay, pauseOverlay, gameoverOverlay, gameoverMessage, pauseButton;
+
+try {
+  canvas = requireElement('game');
+  ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('this browser did not provide a 2D canvas context');
+  scoreEl = requireElement('score');
+  highScoreEl = requireElement('high-score');
+  levelEl = requireElement('level');
+  speedNameEl = requireElement('speed-name');
+  speedMeter = requireElement('speed-meter');
+  scoreDetail = requireElement('score-detail');
+  startOverlay = requireElement('start-overlay');
+  pauseOverlay = requireElement('pause-overlay');
+  gameoverOverlay = requireElement('gameover-overlay');
+  gameoverMessage = requireElement('gameover-message');
+  pauseButton = requireElement('pause-button');
+} catch (error) {
+  reportFatalError(error);
+  throw error;
+}
 
 const SIZE = 800;
 const CELLS = 20;
@@ -25,8 +49,14 @@ const speedLabels = ['FLOW', 'PULSE', 'SURGE', 'HYPER', 'NOVA', 'LUDICROUS'];
 
 let snake, direction, turnQueue, food, score, running, paused, gameOver;
 let lastMove = 0, animationFrame, particles = [], ripples = [], stars = [], highScore = 0, audioCtx, runId = 0;
+let audioDisabled = false;
 
-try { highScore = Number(localStorage.getItem('serpent-high-score')) || 0; } catch { /* storage is optional */ }
+try {
+  const stored = Number(localStorage.getItem('serpent-high-score'));
+  highScore = Number.isFinite(stored) && stored > 0 ? stored : 0;
+} catch (error) {
+  console.warn('[serpent] high score could not be read from localStorage:', error);
+}
 highScoreEl.textContent = String(highScore).padStart(3, '0');
 
 function createStars() {
@@ -54,6 +84,8 @@ function spawnFood() {
       if (!snake.some(s => s.x === x && s.y === y)) openCells.push({ x, y });
     }
   }
+  // No open cell left means the board is cleared; callers must handle the null.
+  if (!openCells.length) return null;
   return openCells[Math.floor(Math.random() * openCells.length)];
 }
 
@@ -107,12 +139,13 @@ function move() {
     food = spawnFood();
     updateHud();
     playTone(380 + score * 1.5, .055, 'triangle');
+    if (!food) { endGame('cleared'); return; }
   } else {
     snake.pop();
   }
 }
 
-function endGame() {
+function endGame(reason) {
   running = false;
   gameOver = true;
   pauseButton.disabled = true;
@@ -122,11 +155,17 @@ function endGame() {
     if (endedRun === runId && gameOver) gameoverOverlay.classList.remove('hidden');
   }, 390);
   const fruitCount = score / 10;
-  gameoverMessage.textContent = `You gathered ${fruitCount} solar fruit${fruitCount === 1 ? '' : 's'} and reached level ${String(getLevel()).padStart(2, '0')}.`;
+  gameoverMessage.textContent = reason === 'cleared'
+    ? `You cleared the garden with ${fruitCount} solar fruits at level ${String(getLevel()).padStart(2, '0')}.`
+    : `You gathered ${fruitCount} solar fruit${fruitCount === 1 ? '' : 's'} and reached level ${String(getLevel()).padStart(2, '0')}.`;
   if (score > highScore) {
     highScore = score;
     highScoreEl.textContent = String(highScore).padStart(3, '0');
-    try { localStorage.setItem('serpent-high-score', highScore); } catch { /* storage is optional */ }
+    try {
+      localStorage.setItem('serpent-high-score', String(highScore));
+    } catch (error) {
+      console.warn('[serpent] high score could not be saved to localStorage:', error);
+    }
   }
   playTone(110, .18, 'sawtooth');
   setTimeout(() => playTone(73, .25, 'sawtooth'), 100);
@@ -176,6 +215,7 @@ function drawBackground(time) {
 }
 
 function drawFood(time) {
+  if (!food) return;
   const x = (food.x + .5) * CELL, y = (food.y + .5) * CELL;
   const pulse = 1 + Math.sin(time * .005) * .1;
   const aura = ctx.createRadialGradient(x, y, 0, x, y, CELL * 1.45 * pulse);
@@ -237,6 +277,20 @@ function drawEffects() {
 }
 
 function animate(time) {
+  try {
+    step(time);
+  } catch (error) {
+    // A throw inside the loop would otherwise stop the game with a frozen board.
+    running = false;
+    paused = false;
+    gameOver = true;
+    cancelAnimationFrame(animationFrame);
+    pauseButton.disabled = true;
+    reportFatalError(error);
+  }
+}
+
+function step(time) {
   const elapsed = time - lastMove;
   if (running && !paused && elapsed >= getMoveDelay()) {
     const moveDelay = getMoveDelay();
@@ -253,12 +307,22 @@ function animate(time) {
 }
 
 function playTone(frequency, duration, type) {
+  if (audioDisabled) return;
   try {
-    audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) throw new Error('Web Audio is not supported');
+    audioCtx ||= new AudioContextCtor();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(error => console.warn('[serpent] audio could not resume:', error));
+    }
     const oscillator = audioCtx.createOscillator(), gain = audioCtx.createGain();
     oscillator.type = type; oscillator.frequency.value = frequency; gain.gain.setValueAtTime(.035, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + duration);
     oscillator.connect(gain).connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + duration);
-  } catch { /* audio is an enhancement */ }
+  } catch (error) {
+    // Audio is an enhancement: report once, then stay silent for the session.
+    audioDisabled = true;
+    console.warn('[serpent] audio disabled:', error);
+  }
 }
 
 document.addEventListener('keydown', event => {
@@ -289,7 +353,11 @@ function handleSwipe(event) {
 canvas.addEventListener('pointerdown', event => {
   activePointerId = event.pointerId;
   touchStart = { x: event.clientX, y: event.clientY };
-  canvas.setPointerCapture?.(event.pointerId);
+  try {
+    canvas.setPointerCapture?.(event.pointerId);
+  } catch (error) {
+    console.warn('[serpent] pointer capture unavailable:', error);
+  }
 });
 canvas.addEventListener('pointermove', handleSwipe);
 canvas.addEventListener('pointerup', event => {
@@ -310,6 +378,11 @@ document.querySelectorAll('.direction-button').forEach(button => {
   });
 });
 
-createStars();
-resetGame();
-drawBackground(0); drawFood(0); drawSnake();
+try {
+  createStars();
+  resetGame();
+  drawBackground(0); drawFood(0); drawSnake();
+} catch (error) {
+  reportFatalError(error);
+  throw error;
+}

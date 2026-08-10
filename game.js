@@ -15,19 +15,52 @@ const pauseButton = document.getElementById('pause-button');
 const SIZE = 800;
 const CELLS = 20;
 const CELL = SIZE / CELLS;
-const directions = {
-  ArrowUp: { x: 0, y: -1 }, w: { x: 0, y: -1 }, W: { x: 0, y: -1 },
-  ArrowDown: { x: 0, y: 1 }, s: { x: 0, y: 1 }, S: { x: 0, y: 1 },
-  ArrowLeft: { x: -1, y: 0 }, a: { x: -1, y: 0 }, A: { x: -1, y: 0 },
-  ArrowRight: { x: 1, y: 0 }, d: { x: 1, y: 0 }, D: { x: 1, y: 0 }
+const DIRECTIONS = {
+  up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 }
+};
+const KEY_DIRECTIONS = {
+  ArrowUp: DIRECTIONS.up, w: DIRECTIONS.up, W: DIRECTIONS.up,
+  ArrowDown: DIRECTIONS.down, s: DIRECTIONS.down, S: DIRECTIONS.down,
+  ArrowLeft: DIRECTIONS.left, a: DIRECTIONS.left, A: DIRECTIONS.left,
+  ArrowRight: DIRECTIONS.right, d: DIRECTIONS.right, D: DIRECTIONS.right
 };
 const speedLabels = ['FLOW', 'PULSE', 'SURGE', 'HYPER', 'NOVA', 'LUDICROUS'];
+const HIGH_SCORE_KEY = 'serpent-high-score';
+const OVERLAYS = [startOverlay, pauseOverlay, gameoverOverlay];
 
 let snake, direction, turnQueue, food, score, running, paused, gameOver;
 let lastMove = 0, animationFrame, particles = [], ripples = [], stars = [], highScore = 0, audioCtx, runId = 0;
 
-try { highScore = Number(localStorage.getItem('serpent-high-score')) || 0; } catch { /* storage is optional */ }
-highScoreEl.textContent = String(highScore).padStart(3, '0');
+function padNumber(value, digits) { return String(value).padStart(digits, '0'); }
+function cellCenter(cell) { return (cell + .5) * CELL; }
+
+// Storage and audio are optional enhancements: never let them break the run.
+function attempt(action) {
+  try { return action(); } catch { return undefined; }
+}
+
+function fillCircle(x, y, radius) {
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+}
+
+function strokeCircle(x, y, radius) {
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.stroke();
+}
+
+function radialGradient(x0, y0, r0, x1, y1, r1, stops) {
+  const gradient = ctx.createRadialGradient(x0, y0, r0, x1, y1, r1);
+  for (const [offset, color] of stops) gradient.addColorStop(offset, color);
+  return gradient;
+}
+
+function hideOverlays(...visible) {
+  for (const overlay of OVERLAYS) overlay.classList.toggle('hidden', !visible.includes(overlay));
+}
+
+function renderHighScore() { highScoreEl.textContent = padNumber(highScore, 3); }
+
+highScore = attempt(() => Number(localStorage.getItem(HIGH_SCORE_KEY))) || 0;
+renderHighScore();
 
 function createStars() {
   stars = Array.from({ length: 100 }, () => ({
@@ -67,9 +100,7 @@ function startGame() {
   gameOver = false;
   // Begin on the next frame, so tapping Start feels instant instead of delayed.
   lastMove = performance.now() - getMoveDelay();
-  startOverlay.classList.add('hidden');
-  pauseOverlay.classList.add('hidden');
-  gameoverOverlay.classList.add('hidden');
+  hideOverlays();
   pauseButton.disabled = false;
   animate(performance.now());
   playTone(220, .035, 'sine');
@@ -78,8 +109,8 @@ function startGame() {
 function togglePause() {
   if (!running || gameOver) return;
   paused = !paused;
-  pauseOverlay.classList.toggle('hidden', !paused);
-  pauseButton.innerHTML = paused ? '<span class="pause-icon">▶</span><span>RESUME</span><kbd>P</kbd>' : '<span class="pause-icon">Ⅱ</span><span>PAUSE</span><kbd>P</kbd>';
+  if (paused) hideOverlays(pauseOverlay); else hideOverlays();
+  pauseButton.innerHTML = paused ? pauseButtonMarkup('▶', 'RESUME') : pauseButtonMarkup('Ⅱ', 'PAUSE');
   if (!paused) { lastMove = performance.now(); animate(lastMove); }
 }
 
@@ -102,8 +133,8 @@ function move() {
   snake.unshift(head);
   if (head.x === food.x && head.y === food.y) {
     score += 10;
-    makeBurst((head.x + .5) * CELL, (head.y + .5) * CELL, '#ff9a8d', 22);
-    ripples.push({ x: (head.x + .5) * CELL, y: (head.y + .5) * CELL, age: 0, hue: 337 });
+    makeBurst(cellCenter(head.x), cellCenter(head.y), '#ff9a8d', 22);
+    ripples.push({ x: cellCenter(head.x), y: cellCenter(head.y), age: 0, hue: 337 });
     food = spawnFood();
     updateHud();
     playTone(380 + score * 1.5, .055, 'triangle');
@@ -116,20 +147,24 @@ function endGame() {
   running = false;
   gameOver = true;
   pauseButton.disabled = true;
-  makeBurst((snake[0].x + .5) * CELL, (snake[0].y + .5) * CELL, '#a783ff', 55);
+  makeBurst(cellCenter(snake[0].x), cellCenter(snake[0].y), '#a783ff', 55);
   const endedRun = runId;
   setTimeout(() => {
     if (endedRun === runId && gameOver) gameoverOverlay.classList.remove('hidden');
   }, 390);
   const fruitCount = score / 10;
-  gameoverMessage.textContent = `You gathered ${fruitCount} solar fruit${fruitCount === 1 ? '' : 's'} and reached level ${String(getLevel()).padStart(2, '0')}.`;
+  gameoverMessage.textContent = `You gathered ${fruitCount} solar fruit${fruitCount === 1 ? '' : 's'} and reached level ${padNumber(getLevel(), 2)}.`;
   if (score > highScore) {
     highScore = score;
-    highScoreEl.textContent = String(highScore).padStart(3, '0');
-    try { localStorage.setItem('serpent-high-score', highScore); } catch { /* storage is optional */ }
+    renderHighScore();
+    attempt(() => localStorage.setItem(HIGH_SCORE_KEY, highScore));
   }
   playTone(110, .18, 'sawtooth');
   setTimeout(() => playTone(73, .25, 'sawtooth'), 100);
+}
+
+function pauseButtonMarkup(icon, label) {
+  return `<span class="pause-icon">${icon}</span><span>${label}</span><kbd>P</kbd>`;
 }
 
 function getLevel() { return Math.min(12, 1 + Math.floor(score / 40)); }
@@ -137,8 +172,8 @@ function getMoveDelay() { return Math.max(50, 105 - (getLevel() - 1) * 6); }
 
 function updateHud() {
   const level = getLevel();
-  scoreEl.textContent = String(score).padStart(3, '0');
-  levelEl.textContent = String(level).padStart(2, '0');
+  scoreEl.textContent = padNumber(score, 3);
+  levelEl.textContent = padNumber(level, 2);
   speedNameEl.textContent = speedLabels[Math.min(speedLabels.length - 1, Math.floor((level - 1) / 2))];
   speedMeter.style.width = `${Math.min(100, 12 + (level - 1) * 8)}%`;
   scoreDetail.textContent = score ? `${snake.length} SEGMENTS SYNCHRONIZED` : 'FIND THE FIRST ORB';
@@ -151,17 +186,15 @@ function roundedRect(x, y, w, h, radius) {
 
 function drawBackground(time) {
   ctx.clearRect(0, 0, SIZE, SIZE);
-  const backdrop = ctx.createRadialGradient(SIZE * .5, SIZE * .43, 0, SIZE * .5, SIZE * .47, SIZE * .73);
-  backdrop.addColorStop(0, '#0d2140');
-  backdrop.addColorStop(.56, '#08172d');
-  backdrop.addColorStop(1, '#040914');
-  ctx.fillStyle = backdrop;
+  ctx.fillStyle = radialGradient(SIZE * .5, SIZE * .43, 0, SIZE * .5, SIZE * .47, SIZE * .73, [
+    [0, '#0d2140'], [.56, '#08172d'], [1, '#040914']
+  ]);
   ctx.fillRect(0, 0, SIZE, SIZE);
 
   for (const star of stars) {
     const flicker = .22 + (Math.sin(time * .0016 + star.phase) + 1) * .16;
     ctx.fillStyle = `rgba(${star.tone}, ${flicker})`;
-    ctx.beginPath(); ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2); ctx.fill();
+    fillCircle(star.x, star.y, star.r);
   }
   ctx.lineWidth = 1;
   for (let i = 0; i <= CELLS; i++) {
@@ -176,23 +209,26 @@ function drawBackground(time) {
 }
 
 function drawFood(time) {
-  const x = (food.x + .5) * CELL, y = (food.y + .5) * CELL;
+  const x = cellCenter(food.x), y = cellCenter(food.y);
   const pulse = 1 + Math.sin(time * .005) * .1;
-  const aura = ctx.createRadialGradient(x, y, 0, x, y, CELL * 1.45 * pulse);
-  aura.addColorStop(0, 'rgba(255, 242, 184, .4)'); aura.addColorStop(.25, 'rgba(255, 90, 132, .24)'); aura.addColorStop(1, 'rgba(255, 71, 158, 0)');
-  ctx.fillStyle = aura; ctx.fillRect(x - CELL * 1.5, y - CELL * 1.5, CELL * 3, CELL * 3);
+  ctx.fillStyle = radialGradient(x, y, 0, x, y, CELL * 1.45 * pulse, [
+    [0, 'rgba(255, 242, 184, .4)'], [.25, 'rgba(255, 90, 132, .24)'], [1, 'rgba(255, 71, 158, 0)']
+  ]);
+  ctx.fillRect(x - CELL * 1.5, y - CELL * 1.5, CELL * 3, CELL * 3);
   ctx.save(); ctx.translate(x, y); ctx.rotate(time * .0012);
   for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.fillStyle = i % 2 ? '#ff8293' : '#ffd488'; ctx.globalAlpha = .77; ctx.beginPath(); ctx.ellipse(0, -CELL * .27, CELL * .09, CELL * .2, 0, 0, Math.PI * 2); ctx.fill(); }
   ctx.restore();
-  const core = ctx.createRadialGradient(x - 4, y - 5, 1, x, y, 14); core.addColorStop(0, '#fffef1'); core.addColorStop(.22, '#fff4b7'); core.addColorStop(.58, '#ff887d'); core.addColorStop(1, '#ef477b');
-  ctx.fillStyle = core; ctx.beginPath(); ctx.arc(x, y, 13 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = radialGradient(x - 4, y - 5, 1, x, y, 14, [
+    [0, '#fffef1'], [.22, '#fff4b7'], [.58, '#ff887d'], [1, '#ef477b']
+  ]);
+  fillCircle(x, y, 13 * pulse);
 }
 
 function drawSnake() {
   // Render the current grid position. Interpolation made the snake appear to
   // trail behind every turn, which felt like input lag.
   const segments = snake.map((current, index) => ({
-    x: (current.x + .5) * CELL, y: (current.y + .5) * CELL, index
+    x: cellCenter(current.x), y: cellCenter(current.y), index
   }));
   if (!segments.length) return;
   ctx.save();
@@ -209,17 +245,18 @@ function drawSnake() {
   ctx.shadowBlur = 0;
   for (let i = segments.length - 1; i >= 0; i--) {
     const s = segments[i]; const r = Math.max(7, CELL * (.30 - Math.min(i, 12) * .006));
-    const grad = ctx.createRadialGradient(s.x - r * .3, s.y - r * .4, 1, s.x, s.y, r * 1.2);
-    grad.addColorStop(0, i === 0 ? '#edffff' : '#b5ffe8'); grad.addColorStop(.25, i === 0 ? '#73ffdd' : '#57dcbf'); grad.addColorStop(1, i === 0 ? '#3478bd' : '#4b53ad');
-    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
-    if (i % 2 === 0 && i > 1) { ctx.fillStyle = 'rgba(232,255,252,.36)'; ctx.beginPath(); ctx.arc(s.x - r * .2, s.y - r * .28, r * .16, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = radialGradient(s.x - r * .3, s.y - r * .4, 1, s.x, s.y, r * 1.2, [
+      [0, i === 0 ? '#edffff' : '#b5ffe8'], [.25, i === 0 ? '#73ffdd' : '#57dcbf'], [1, i === 0 ? '#3478bd' : '#4b53ad']
+    ]);
+    fillCircle(s.x, s.y, r);
+    if (i % 2 === 0 && i > 1) { ctx.fillStyle = 'rgba(232,255,252,.36)'; fillCircle(s.x - r * .2, s.y - r * .28, r * .16); }
   }
   const head = segments[0];
   const ex = direction.x, ey = direction.y, sx = -direction.y, sy = direction.x;
   for (const side of [-1, 1]) {
     const eyeX = head.x + ex * 7 + sx * side * 7, eyeY = head.y + ey * 7 + sy * side * 7;
-    ctx.fillStyle = '#071123'; ctx.beginPath(); ctx.arc(eyeX, eyeY, 4.1, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#c8fffd'; ctx.beginPath(); ctx.arc(eyeX + ex * 1.2, eyeY + ey * 1.2, 1.35, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#071123'; fillCircle(eyeX, eyeY, 4.1);
+    ctx.fillStyle = '#c8fffd'; fillCircle(eyeX + ex * 1.2, eyeY + ey * 1.2, 1.35);
   }
   ctx.restore();
 }
@@ -230,9 +267,9 @@ function makeBurst(x, y, color, count) {
 function drawEffects() {
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   particles = particles.filter(p => p.life > .02);
-  for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vx *= .96; p.vy *= .96; p.life *= .95; ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill(); }
+  for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vx *= .96; p.vy *= .96; p.life *= .95; ctx.globalAlpha = p.life; ctx.fillStyle = p.color; fillCircle(p.x, p.y, p.size * p.life); }
   ripples = ripples.filter(r => r.age < 1);
-  for (const r of ripples) { r.age += .023; ctx.globalAlpha = 1 - r.age; ctx.strokeStyle = `hsla(${r.hue}, 95%, 72%, .85)`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(r.x, r.y, 10 + r.age * 45, 0, Math.PI * 2); ctx.stroke(); }
+  for (const r of ripples) { r.age += .023; ctx.globalAlpha = 1 - r.age; ctx.strokeStyle = `hsla(${r.hue}, 95%, 72%, .85)`; ctx.lineWidth = 2; strokeCircle(r.x, r.y, 10 + r.age * 45); }
   ctx.restore();
 }
 
@@ -253,28 +290,27 @@ function animate(time) {
 }
 
 function playTone(frequency, duration, type) {
-  try {
+  attempt(() => {
     audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = audioCtx.createOscillator(), gain = audioCtx.createGain();
     oscillator.type = type; oscillator.frequency.value = frequency; gain.gain.setValueAtTime(.035, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + duration);
     oscillator.connect(gain).connect(audioCtx.destination); oscillator.start(); oscillator.stop(audioCtx.currentTime + duration);
-  } catch { /* audio is an enhancement */ }
+  });
 }
 
 document.addEventListener('keydown', event => {
   if (event.code === 'Space') { event.preventDefault(); if (!running || gameOver) startGame(); else togglePause(); return; }
   if (event.key === 'p' || event.key === 'P') { togglePause(); return; }
   if (event.key === 'r' || event.key === 'R') { startGame(); return; }
-  if (directions[event.key]) { event.preventDefault(); setDirection(directions[event.key]); }
+  if (KEY_DIRECTIONS[event.key]) { event.preventDefault(); setDirection(KEY_DIRECTIONS[event.key]); }
 });
 document.getElementById('start-button').addEventListener('click', startGame);
 document.getElementById('restart-button').addEventListener('click', startGame);
 document.getElementById('resume-button').addEventListener('click', togglePause);
 pauseButton.addEventListener('click', togglePause);
-const touchDirections = {
-  up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 }
-};
 let touchStart, activePointerId;
+
+function clearTouch() { touchStart = undefined; activePointerId = undefined; }
 
 function handleSwipe(event) {
   if (!touchStart || event.pointerId !== activePointerId) return;
@@ -294,14 +330,14 @@ canvas.addEventListener('pointerdown', event => {
 canvas.addEventListener('pointermove', handleSwipe);
 canvas.addEventListener('pointerup', event => {
   handleSwipe(event);
-  if (event.pointerId === activePointerId) { touchStart = undefined; activePointerId = undefined; }
+  if (event.pointerId === activePointerId) clearTouch();
 });
-canvas.addEventListener('pointercancel', () => { touchStart = undefined; activePointerId = undefined; });
+canvas.addEventListener('pointercancel', clearTouch);
 
 document.querySelectorAll('.direction-button').forEach(button => {
   const applyDirection = event => {
     event.preventDefault();
-    setDirection(touchDirections[button.dataset.direction]);
+    setDirection(DIRECTIONS[button.dataset.direction]);
   };
   button.addEventListener('pointerdown', applyDirection);
   button.addEventListener('click', event => {

@@ -1,0 +1,211 @@
+---
+import Layout from '../layouts/Layout.astro';
+import TopBar from '../components/TopBar.astro';
+import Hero from '../components/Hero.astro';
+import StatRail from '../components/StatRail.astro';
+import GameStage from '../components/GameStage.astro';
+import TouchControls from '../components/TouchControls.astro';
+import InfoRail from '../components/InfoRail.astro';
+import SeoContent from '../components/SeoContent.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+
+<Layout>
+  <main class="app-shell">
+    <TopBar />
+    <Hero />
+
+    <section class="game-layout" aria-label="Snake game">
+      <StatRail />
+      <div class="board-column">
+        <GameStage />
+        <TouchControls />
+      </div>
+      <InfoRail />
+    </section>
+
+    <SeoContent />
+    <SiteFooter />
+  </main>
+</Layout>
+
+<style>
+  .app-shell {
+    position: relative;
+    width: min(1240px, 100%);
+    min-height: 100vh;
+    margin: 0 auto;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: max(env(safe-area-inset-right, 0px), clamp(20px, 4vw, 64px));
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 40px);
+    padding-left: max(env(safe-area-inset-left, 0px), clamp(20px, 4vw, 64px));
+  }
+
+  .game-layout {
+    display: grid;
+    grid-template-columns: 180px minmax(360px, 620px) 180px;
+    gap: clamp(16px, 2vw, 28px);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .board-column {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+  }
+
+  /* Direction pad: only meaningful for touch input, so key it off pointer type
+     instead of viewport width. Landscape phones are handled below. */
+  @media (pointer: fine) {
+    .board-column .touch-controls {
+      display: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .board-column .touch-controls {
+      display: flex;
+      padding: 14px;
+      border: 1px solid var(--color-hairline);
+      border-radius: var(--radius-card);
+      background: var(--color-canvas-card);
+    }
+  }
+
+  @media (max-width: 1020px) {
+    .game-layout {
+      grid-template-columns: 150px minmax(340px, 560px);
+    }
+    .info-rail {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      align-items: stretch;
+    }
+    .guide-card,
+    .pause-button {
+      min-height: auto;
+    }
+    .key-grid {
+      margin: 12px auto;
+    }
+    .fruit-card {
+      justify-content: center;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .app-shell {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-right: max(14px, env(safe-area-inset-right, 0px));
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+      padding-left: max(14px, env(safe-area-inset-left, 0px));
+    }
+    .hero {
+      padding-left: 0;
+      margin-bottom: 26px;
+    }
+    .game-layout {
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .stat-rail {
+      grid-row: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.1fr;
+      gap: 8px;
+    }
+    .stat-card {
+      min-height: 88px;
+      padding: 13px 12px;
+    }
+    .stat-value {
+      font-size: 23px;
+    }
+    .board-column {
+      grid-row: 2;
+      gap: 14px;
+    }
+    .info-rail {
+      grid-row: 3;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .info-rail .guide-card:first-child {
+      display: none;
+    }
+    .pause-button,
+    .primary-button {
+      min-height: 52px;
+    }
+  }
+
+  /* Reclaim vertical space once a run is in progress on small screens. */
+  @media (max-width: 700px) {
+    body.is-playing .hero {
+      display: none;
+    }
+  }
+
+  @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {
+    .app-shell {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-right: max(14px, env(safe-area-inset-right, 0px));
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+      padding-left: max(14px, env(safe-area-inset-left, 0px));
+    }
+    .hero,
+    footer {
+      display: none;
+    }
+    .game-layout {
+      grid-template-columns: 110px minmax(250px, min(62vh, calc(100vw - 300px))) 130px;
+      gap: 10px;
+    }
+    .stat-rail {
+      display: flex;
+      grid-column: 1;
+      grid-row: 1;
+      gap: 8px;
+    }
+    .stat-card {
+      min-height: 0;
+      padding: 8px;
+    }
+    .stat-value {
+      margin: 2px 0;
+      font-size: 18px;
+    }
+    .stat-detail {
+      display: none;
+    }
+    .level-row {
+      margin: 2px 0 6px;
+    }
+    .board-column {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .board-column .touch-controls {
+      display: none;
+    }
+    .info-rail {
+      display: flex;
+      grid-column: 3;
+      grid-row: 1;
+      gap: 8px;
+    }
+    .info-rail .guide-card:first-child {
+      display: none;
+    }
+    .guide-card {
+      padding: 10px;
+    }
+    .fruit-sample {
+      width: 28px;
+      height: 28px;
+    }
+  }
+</style>

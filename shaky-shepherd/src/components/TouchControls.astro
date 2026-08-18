@@ -1,0 +1,92 @@
+---
+---
+<section class="touch-controls" aria-label="Touch controls">
+  <p class="eyebrow touch-label" translate="no">TOUCH CONTROLS</p>
+  <div class="direction-pad" role="group" aria-label="Move the snake">
+    <button class="direction-button direction-up" type="button" data-direction="up" aria-label="Move up">↑</button>
+    <button class="direction-button direction-left" type="button" data-direction="left" aria-label="Move left">←</button>
+    <button class="direction-button direction-down" type="button" data-direction="down" aria-label="Move down">↓</button>
+    <button class="direction-button direction-right" type="button" data-direction="right" aria-label="Move right">→</button>
+  </div>
+  <p class="touch-note" translate="no">SWIPE ON THE BOARD OR TAP A DIRECTION</p>
+</section>
+
+<style>
+  .touch-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .touch-label,
+  .touch-note {
+    margin: 0;
+  }
+
+  .touch-label {
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  .touch-note {
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+
+  .direction-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 54px);
+    gap: 8px;
+  }
+
+  .direction-button {
+    display: grid;
+    place-items: center;
+    min-width: 54px;
+    min-height: 54px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 9999px;
+    background-color: transparent;
+    color: var(--color-ink);
+    font: 400 26px/1 var(--font-sans);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    transition:
+      border-color 0.18s ease,
+      background-color 0.18s ease,
+      transform 0.12s ease;
+  }
+
+  .direction-button:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+
+  .direction-button:active {
+    transform: scale(0.92);
+    border-color: var(--color-sunset);
+    background-color: rgba(255, 122, 23, 0.12);
+  }
+
+  .direction-up {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .direction-left {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .direction-down {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .direction-right {
+    grid-column: 3;
+    grid-row: 2;
+  }
+</style>

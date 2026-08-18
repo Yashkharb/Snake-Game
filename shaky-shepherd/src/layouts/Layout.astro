@@ -1,0 +1,123 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+}
+
+const {
+  title = 'Snake Game — Play Classic Snake Game Online Free',
+  description =
+    'Play the classic snake game online for free. Guide the hungry snake, eat food, and grow longer in this fast-paced arcade snake game. No download, no login.',
+  image = `${new URL(import.meta.env.BASE_URL + 'og-image.png', Astro.site).href}`,
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'VideoGame',
+  name: 'Snake Game',
+  alternateName: 'Classic Snake Game Online',
+  url: canonicalURL.href,
+  description,
+  genre: ['Arcade', 'Classic'],
+  operatingSystem: 'Any',
+  applicationCategory: 'GameApplication',
+  inLanguage: 'en',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+    availability: 'https://schema.org/InStock',
+  },
+  author: {
+    '@type': 'Organization',
+    name: 'Serpent Systems',
+  },
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'sha256-EclVj+ZTA/cSRwdE8mkszs5mYK8OAiTAL228Eg1BVs8=' 'sha256-NlXz1eBTz5BNWHC80Rtv+5vb9ZxdJ6m3y9wT0TCutQk=' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src https://www.googletagmanager.com https://www.google-analytics.com https://stats.g.doubleclick.net; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta
+      name="keywords"
+      content="snake game, google snake game, snake game google, the snake game, snake game online, classic snake game, snake game 3, snake game 2, hungry snake game"
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href={canonicalURL.href} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL.href} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:site_name" content="Snake Game" />
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Play the classic snake game online — collect food, grow your hungry snake, and chase the high score." />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+
+    <script type="application/ld+json" is:inline set:html={JSON.stringify(structuredData)}></script>
+
+    <link rel="icon" type="image/png" href={import.meta.env.BASE_URL + 'favicon-96x96.png'} sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href={import.meta.env.BASE_URL + 'favicon.svg'} />
+    <link rel="shortcut icon" href={import.meta.env.BASE_URL + 'favicon.ico'} />
+    <link rel="apple-touch-icon" sizes="180x180" href={import.meta.env.BASE_URL + 'apple-touch-icon.png'} />
+    <meta name="apple-mobile-web-app-title" content="SnakeGame" />
+    <link rel="manifest" href={import.meta.env.BASE_URL + 'site.webmanifest'} />
+    <link rel="preload" href={import.meta.env.BASE_URL + 'fonts/outfit-latin.woff2'} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={import.meta.env.BASE_URL + 'fonts/dm-mono-400-latin.woff2'} as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href={import.meta.env.BASE_URL + 'fonts/fonts.css'} />
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+
+    <script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-KKNVC77HXJ"></script>
+    <script is:inline>window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-KKNVC77HXJ');</script>
+  </head>
+  <body>
+    <a class="skip-link" href="#game-stage">Skip to game</a>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  .skip-link {
+    position: absolute;
+    top: -48px;
+    left: 16px;
+    z-index: 100;
+    padding: 10px 16px;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    color: #0a0a0a;
+    font-size: 14px;
+    text-decoration: none;
+    transition: top 0.18s ease;
+  }
+  .skip-link:focus-visible {
+    top: 16px;
+  }
+</style>

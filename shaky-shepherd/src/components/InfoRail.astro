@@ -1,0 +1,113 @@
+---
+---
+<aside class="info-rail" aria-label="Controls and status">
+  <div class="card guide-card">
+    <span class="eyebrow stat-label" translate="no">NAVIGATION</span>
+    <div class="key-grid" aria-hidden="true">
+      <i></i><b>↑</b><i></i>
+      <b>←</b><b>↓</b><b>→</b>
+    </div>
+    <span class="stat-detail" translate="no">OR W A S D</span>
+  </div>
+
+  <div class="card guide-card fruit-card">
+    <span class="fruit-sample" aria-hidden="true"><i></i></span>
+    <div class="fruit-copy">
+      <span class="eyebrow stat-label" translate="no">SOLAR FRUIT</span>
+      <span class="stat-detail" translate="no">+10 ENERGY</span>
+    </div>
+  </div>
+
+  <button class="btn-pill pause-button" id="pause-button" disabled>
+    <span class="pause-icon" aria-hidden="true">Ⅱ</span>
+    <span translate="no">PAUSE</span>
+    <kbd class="keycap" translate="no">P</kbd>
+  </button>
+</aside>
+
+<style>
+  .info-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .guide-card {
+    padding: 18px;
+  }
+
+  .stat-label {
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  .stat-detail {
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    line-height: 1.5;
+  }
+
+  .key-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 28px);
+    grid-template-rows: repeat(2, 28px);
+    gap: 5px;
+    margin: 16px 0 12px;
+    justify-content: center;
+  }
+
+  .key-grid b {
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 9999px;
+    color: var(--color-body);
+    background-color: var(--color-canvas-soft);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  .fruit-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .fruit-sample {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff7ed 0 7%, #ffc285 18%, #ff7a17 42%, rgba(255, 122, 23, 0.12) 68%);
+    box-shadow: 0 0 16px rgba(255, 122, 23, 0.45);
+  }
+
+  .fruit-sample i {
+    width: 7px;
+    height: 5px;
+    border-radius: 100% 0;
+    background: #ffffff;
+    transform: translateY(-15px) rotate(20deg);
+  }
+
+  .fruit-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .pause-button {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .pause-icon {
+    color: var(--color-sunset);
+    font-size: 17px;
+    line-height: 1;
+  }
+</style>

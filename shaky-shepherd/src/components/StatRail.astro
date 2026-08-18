@@ -1,0 +1,96 @@
+---
+---
+<aside class="stat-rail" aria-label="Game statistics">
+  <div class="card stat-card">
+    <span class="eyebrow stat-label" translate="no">SCORE</span>
+    <strong id="score" class="stat-value">000</strong>
+    <span class="stat-detail" id="score-detail" translate="no">FIND THE FIRST ORB</span>
+  </div>
+
+  <div class="card stat-card">
+    <span class="eyebrow stat-label" translate="no">BEST RUN</span>
+    <strong id="high-score" class="stat-value">000</strong>
+    <span class="stat-detail" translate="no">LOCAL RECORD</span>
+  </div>
+
+  <div class="card stat-card">
+    <span class="eyebrow stat-label" translate="no">VELOCITY</span>
+    <div class="level-row">
+      <strong id="level" class="stat-value level-value">01</strong>
+      <span id="speed-name" class="speed-name" translate="no">FLOW</span>
+    </div>
+    <div class="meter" aria-hidden="true"><i id="speed-meter"></i></div>
+  </div>
+</aside>
+
+<style>
+  .stat-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .stat-card {
+    min-height: 108px;
+    padding: 18px 18px 16px;
+  }
+
+  .stat-label {
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  .stat-value {
+    display: block;
+    margin: 8px 0 4px;
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 30px;
+    font-weight: 400;
+    letter-spacing: -0.06em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-detail {
+    display: block;
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    line-height: 1.5;
+  }
+
+  .level-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 8px 0 10px;
+  }
+
+  .level-row .level-value {
+    margin: 0;
+  }
+
+  .speed-name {
+    color: var(--color-sunset);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+  }
+
+  .meter {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: var(--color-hairline);
+  }
+
+  .meter i {
+    display: block;
+    width: 13%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--color-sunset), var(--color-dusk));
+    box-shadow: 0 0 8px rgba(255, 122, 23, 0.6);
+    transition: width 0.3s ease;
+  }
+</style>

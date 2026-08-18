@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   Serpent design tokens — derived from DESIGN.md (xAI language)
+   ───────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Type — Universal Sans → Outfit · Geist Mono → DM Mono */
+  --font-sans: 'Outfit', Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Surfaces */
+  --color-canvas: #0a0a0a;
+  --color-canvas-soft: #1a1c20;
+  --color-canvas-card: #191919;
+  --color-canvas-mid: #363a3f;
+  --color-hairline: #212327;
+
+  /* Text */
+  --color-ink: #ffffff;
+  --color-ink-hover: #fafaf7;
+  --color-body: #dadbdf;
+  --color-mute: #7d8187;
+
+  /* Accents — used sparingly, reserved for the game itself */
+  --color-sunset: #ff7a17;
+  --color-sunset-soft: #ffc285;
+  --color-dusk: #7c3aed;
+  --color-twilight: #c4b5fd;
+  --color-breeze: #a0c3ec;
+  --color-midnight: #0d1726;
+
+  /* Shape */
+  --radius-card: 8px;
+  --radius-pill: 9999px;
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    overflow-x: hidden;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--color-sunset);
+    color: var(--color-canvas);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-sunset);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Low-level project utilities */
+
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+@utility display-tight {
+  font-weight: 400;
+  letter-spacing: -0.05em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+/* Stable component primitives (xAI vocabulary) */
+
+@layer components {
+  /* Cards — tight 8px rectangle, hairline border, no shadow. */
+  .card {
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background-color: var(--color-canvas-card);
+  }
+
+  /* The canonical xAI outline pill. */
+  .btn-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 40px;
+    padding: 8px 18px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--radius-pill);
+    background-color: transparent;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color 0.18s ease,
+      background-color 0.18s ease,
+      transform 0.18s ease;
+  }
+
+  .btn-pill:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.55);
+  }
+
+  .btn-pill:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .btn-pill:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+  }
+
+  /* The rare xAI filled pill — one primary action per screen. */
+  .btn-pill--primary {
+    border-color: var(--color-ink);
+    background-color: var(--color-ink);
+    color: #0a0a0a;
+    font-weight: 500;
+  }
+
+  .btn-pill--primary:hover:not(:disabled) {
+    background-color: var(--color-ink-hover);
+    border-color: var(--color-ink-hover);
+  }
+
+  /* Emergency banner shown when the game engine cannot boot. */
+  .fatal-error {
+    position: fixed;
+    inset: auto 16px 16px 16px;
+    z-index: 50;
+    margin: 0;
+    padding: 14px 18px;
+    border: 1px solid rgba(255, 122, 23, 0.55);
+    border-radius: var(--radius-card);
+    background: rgba(20, 12, 4, 0.95);
+    color: #ffd9b3;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+
+  /* Mono keycap hint used inside pill buttons. */
+  .keycap {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    border: 1px solid currentColor;
+    opacity: 0.55;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Touch-first devices: roomier targets, drop keyboard hints. */
+  @media (pointer: coarse) {
+    .btn-pill {
+      min-height: 48px;
+    }
+    .keycap {
+      display: none;
+    }
+  }
+}

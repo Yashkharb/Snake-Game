@@ -7,38 +7,85 @@
   <div class="board-corner corner-br" aria-hidden="true"></div>
 
   <canvas id="game-board" aria-label="Snake game board"></canvas>
+  <span class="mode-badge" id="mode-badge" translate="no">CLASSIC</span>
   <div class="scanline" aria-hidden="true"></div>
+  <div class="visually-hidden" id="status-announcer" role="status" aria-live="polite"></div>
 
   <div class="game-overlay" id="start-overlay">
-    <div class="overlay-orb" aria-hidden="true"></div>
-    <p class="eyebrow overlay-kicker" translate="no">SYSTEM READY</p>
-    <h2 class="display-tight">Enter the garden</h2>
+    <div class="overlay-glow" aria-hidden="true"></div>
+    <p class="eyebrow overlay-kicker" id="start-kicker">GET READY</p>
+    <h2 class="display-tight" id="start-title">Ready to play?</h2>
+    <p class="overlay-date" id="daily-date" hidden></p>
     <p class="overlay-text">
-      Guide the serpent with the direction pad or a swipe. Collect solar fruit. Never touch the
-      perimeter — or yourself.
+      Steer the snake with the arrow keys, WASD, or a swipe. Collect the fruit to grow.
     </p>
+    <p class="overlay-note" id="start-mode-note">
+      Standard Snake rules: eat fruit, grow, and don't hit the wall or your own tail.
+    </p>
+    <p class="overlay-best" id="daily-best" hidden></p>
     <button class="btn-pill btn-pill--primary" id="start-button">
-      <span>Start run</span><kbd class="keycap" translate="no">Space</kbd>
+      <span id="start-button-label">Start run</span><kbd class="keycap">Space</kbd>
     </button>
-    <p class="control-hint" translate="no"><span>SWIPE OR USE THE DIRECTION PAD</span></p>
+    <p class="control-hint"><span>ARROW KEYS · WASD · SWIPE OR DIRECTION PAD</span></p>
   </div>
 
   <div class="game-overlay hidden" id="pause-overlay">
-    <p class="eyebrow overlay-kicker" translate="no">SIGNAL HELD</p>
+    <p class="eyebrow overlay-kicker">PAUSED</p>
     <h2 class="display-tight">Paused</h2>
-    <p class="overlay-text">Take a breath. The garden is holding its pulse.</p>
+    <p class="overlay-text">Take a breath — you can pick up right where you left off.</p>
     <button class="btn-pill btn-pill--primary" id="resume-button">
-      <span>Resume run</span><kbd class="keycap" translate="no">Space</kbd>
+      <span>Resume run</span><kbd class="keycap">Space</kbd>
     </button>
   </div>
 
   <div class="game-overlay hidden" id="gameover-overlay">
-    <p class="eyebrow overlay-kicker failure" translate="no">RUN TERMINATED</p>
-    <h2 class="display-tight">Beautiful chaos.</h2>
-    <p class="overlay-text" id="gameover-message" aria-live="polite"></p>
-    <button class="btn-pill btn-pill--primary" id="restart-button">
-      <span>Run it back</span><kbd class="keycap" translate="no">R</kbd>
-    </button>
+    <p class="eyebrow overlay-kicker" id="gameover-kicker">RUN OVER</p>
+    <h2 class="display-tight" id="gameover-title">You hit the wall.</h2>
+
+    <div class="result-score">
+      <span class="eyebrow result-score-label" translate="no">SCORE</span>
+      <strong id="final-score" class="result-score-value">000</strong>
+      <span class="result-new-best" id="new-best-badge" translate="no">NEW BEST</span>
+    </div>
+
+    <dl class="result-grid" aria-label="Run results">
+      <div class="result-item">
+        <dt translate="no">BEST</dt>
+        <dd id="final-best">000</dd>
+      </div>
+      <div class="result-item">
+        <dt translate="no">LEVEL</dt>
+        <dd id="final-level">01</dd>
+      </div>
+      <div class="result-item">
+        <dt translate="no">LENGTH</dt>
+        <dd id="final-length">4</dd>
+      </div>
+      <div class="result-item">
+        <dt translate="no">LONGEST</dt>
+        <dd id="final-longest">4</dd>
+      </div>
+      <div class="result-item">
+        <dt translate="no">FRUIT</dt>
+        <dd id="final-fruit">0</dd>
+      </div>
+      <div class="result-item">
+        <dt translate="no">TIME</dt>
+        <dd id="final-duration">0:00</dd>
+      </div>
+    </dl>
+
+    <div class="result-actions">
+      <button class="btn-pill btn-pill--primary" id="restart-button">
+        <span>Play again</span><kbd class="keycap" translate="no">R</kbd>
+      </button>
+      <button class="btn-pill btn-pill--secondary" id="copy-button" type="button" hidden>
+        <span id="copy-button-label">Copy result</span>
+      </button>
+      <button class="btn-pill btn-pill--secondary" id="share-button" type="button">
+        <span id="share-button-label">Share score</span>
+      </button>
+    </div>
   </div>
 </section>
 
@@ -133,18 +180,23 @@
     text-align: center;
     background: radial-gradient(circle at center, rgba(26, 28, 32, 0.7), rgba(10, 10, 10, 0.88));
     backdrop-filter: blur(4px);
-    transition:
-      opacity 0.3s ease,
-      visibility 0.3s ease;
+    transition: opacity 0.3s ease;
   }
 
+  /* Fade out, then drop from layout/a11y/focus order. Visibility snaps on
+     when showing so the overlay (and its buttons) are immediately
+     focusable/announceable — a discrete visibility transition would otherwise
+     keep the overlay hidden for the first half of the fade-in. */
   .game-overlay.hidden {
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
+    transition:
+      opacity 0.3s ease,
+      visibility 0s linear 0.3s;
   }
 
-  .overlay-orb {
+  .overlay-glow {
     width: 54px;
     height: 54px;
     margin-bottom: 24px;
@@ -165,6 +217,98 @@
     color: var(--color-twilight);
   }
 
+  .result-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin: 14px 0 18px;
+  }
+
+  .result-score-label {
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  .result-score-value {
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: clamp(44px, 8vw, 64px);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.06em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .result-new-best {
+    display: none;
+    margin-top: 6px;
+    padding: 3px 12px;
+    border: 1px solid rgba(255, 122, 23, 0.6);
+    border-radius: 9999px;
+    color: var(--color-sunset-soft);
+    background: rgba(255, 122, 23, 0.1);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    box-shadow: 0 0 14px rgba(255, 122, 23, 0.35);
+  }
+
+  .result-new-best.is-new-best {
+    display: inline-block;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    width: min(320px, 100%);
+    margin: 0 0 22px;
+  }
+
+  .result-item {
+    padding: 8px 10px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .result-item dt {
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .result-item dd {
+    margin: 4px 0 0;
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .result-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-pill--secondary {
+    border-color: rgba(255, 122, 23, 0.5);
+    color: var(--color-sunset-soft);
+  }
+
+  .btn-pill--secondary:hover:not(:disabled) {
+    border-color: var(--color-sunset);
+  }
+
+  .btn-pill[hidden] {
+    display: none;
+  }
+
   h2 {
     margin: 10px 0 10px;
     font-size: clamp(30px, 4vw, 42px);
@@ -177,6 +321,78 @@
     font-size: 14px;
     line-height: 1.6;
     text-wrap: pretty;
+  }
+
+  /* Mode-specific rule line shown on the start screen (set by the engine). */
+  .overlay-note {
+    max-width: 320px;
+    margin: -16px 0 22px;
+    color: var(--color-sunset-soft);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    text-wrap: pretty;
+  }
+
+  /* Daily Challenge identity lines (date + best) — visible only in daily mode.
+     The [hidden] selector outranks the .is-daily display rule, so a stale
+     hidden attribute always wins. */
+  .overlay-date,
+  .overlay-best {
+    margin: 0;
+    color: var(--color-sunset-soft);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .game-overlay.is-daily .overlay-date[hidden],
+  .game-overlay.is-daily .overlay-best[hidden] {
+    display: none;
+  }
+
+  .game-overlay.is-daily .overlay-text {
+    display: none;
+  }
+
+  .game-overlay.is-daily .overlay-date {
+    display: block;
+    margin: -6px 0 14px;
+    color: var(--color-ink);
+  }
+
+  .game-overlay.is-daily .overlay-note {
+    margin: 0 0 12px;
+  }
+
+  .game-overlay.is-daily .overlay-best {
+    display: block;
+    margin: 0 0 22px;
+    color: var(--color-sunset);
+  }
+
+  /* Persistent mode indicator, on top of every overlay (incl. results). */
+  .mode-badge {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    z-index: 6;
+    padding: 4px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 9999px;
+    background: rgba(10, 10, 10, 0.72);
+    color: rgba(255, 255, 255, 0.85);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    backdrop-filter: blur(3px);
+    pointer-events: none;
+    user-select: none;
+    transform: translateX(-50%);
   }
 
   .control-hint {
@@ -202,7 +418,13 @@
     .game-overlay {
       padding: 18px;
     }
-    .overlay-orb {
+    /* The Daily Challenge screen reads as a card: top-align it so the Play
+       challenge CTA stays above the fold on small portrait phones. */
+    .game-overlay.is-daily {
+      justify-content: flex-start;
+      padding-top: 18px;
+    }
+    .overlay-glow {
       width: 34px;
       height: 34px;
       margin-bottom: 12px;
@@ -215,8 +437,57 @@
       margin-bottom: 18px;
       font-size: 13px;
     }
+    .overlay-note {
+      margin: -14px 0 14px;
+      font-size: 10px;
+    }
+    .game-overlay.is-daily .overlay-date {
+      margin: -4px 0 8px;
+    }
+    .game-overlay.is-daily .overlay-note {
+      margin: 0 0 6px;
+    }
+    .game-overlay.is-daily .overlay-best {
+      margin: 0 0 12px;
+    }
+    .overlay-date,
+    .overlay-best {
+      font-size: 10px;
+    }
     .control-hint {
       display: none;
+    }
+    .result-score {
+      margin: 10px 0 12px;
+    }
+    .result-score-value {
+      font-size: 40px;
+    }
+    .result-grid {
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+    .result-item {
+      padding: 6px 8px;
+    }
+    .result-item dd {
+      font-size: 13px;
+    }
+    .result-actions {
+      flex-direction: column-reverse;
+      gap: 8px;
+      width: 100%;
+    }
+    .result-actions .btn-pill {
+      width: 100%;
+    }
+  }
+
+  /* Small portrait screens: roomy primary-action touch targets. */
+  @media (max-width: 700px) {
+    .btn-pill--primary,
+    .btn-pill--secondary {
+      min-height: 52px;
     }
   }
 
@@ -225,7 +496,7 @@
     .game-overlay {
       padding: 12px;
     }
-    .overlay-orb {
+    .overlay-glow {
       width: 26px;
       height: 26px;
       margin-bottom: 8px;
@@ -235,8 +506,27 @@
       font-size: 24px;
     }
     .overlay-text,
-    .control-hint {
+    .overlay-note,
+    .overlay-date,
+    .overlay-best,
+    .control-hint,
+    .result-grid {
       display: none;
+    }
+    .result-score {
+      margin: 8px 0 12px;
+    }
+    .result-score-value {
+      font-size: 34px;
+    }
+    .result-actions {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .result-actions .btn-pill {
+      min-height: 36px;
+      padding: 6px 12px;
+      font-size: 12px;
     }
   }
 </style>

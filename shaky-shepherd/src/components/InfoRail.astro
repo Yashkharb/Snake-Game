@@ -13,8 +13,8 @@
   <div class="card guide-card fruit-card">
     <span class="fruit-sample" aria-hidden="true"><i></i></span>
     <div class="fruit-copy">
-      <span class="eyebrow stat-label" translate="no">SOLAR FRUIT</span>
-      <span class="stat-detail" translate="no">+10 ENERGY</span>
+      <span class="eyebrow stat-label">FRUIT</span>
+      <span class="stat-detail">+10 POINTS</span>
     </div>
   </div>
 
@@ -109,5 +109,59 @@
     color: var(--color-sunset);
     font-size: 17px;
     line-height: 1;
+  }
+
+  /* ≤1020px: the rail becomes a full-width strip under the board. */
+  @media (max-width: 1020px) {
+    .info-rail {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      align-items: center;
+    }
+    .guide-card {
+      min-height: auto;
+    }
+    .key-grid {
+      margin: 12px auto;
+    }
+    .fruit-card {
+      justify-content: center;
+    }
+  }
+
+  /* ≤700px portrait: two-up grid, drop the keyboard guide. */
+  @media (max-width: 700px) {
+    .info-rail {
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .info-rail .guide-card:first-child {
+      display: none;
+    }
+    .pause-button {
+      min-height: 52px;
+    }
+  }
+
+  /* Short landscape: slim right rail beside the board. */
+  @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {
+    .info-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .info-rail .guide-card:first-child {
+      display: none;
+    }
+    .guide-card {
+      padding: 10px;
+    }
+    .fruit-sample {
+      width: 28px;
+      height: 28px;
+    }
+    .pause-button {
+      min-height: 52px;
+    }
   }
 </style>

@@ -1,0 +1,112 @@
+---
+import { GAME_MODES, MODE_IDS } from '../game/modes';
+---
+<div class="mode-picker" id="mode-picker">
+  <div class="mode-picker__tabs" role="group" aria-label="Choose game mode">
+    {MODE_IDS.map((id) => {
+      const mode = GAME_MODES[id];
+      return (
+        <button
+          type="button"
+          class="mode-picker__tab"
+          data-mode={id}
+          aria-pressed={id === 'classic' ? 'true' : 'false'}
+        >
+          <span class="mode-picker__short">{mode.shortName}</span>
+        </button>
+      );
+    })}
+  </div>
+  <p class="mode-picker__description" id="mode-description">{GAME_MODES.classic.description}</p>
+</div>
+
+<script>
+  // The picker is wired to the engine in game.ts via [data-mode]; nothing to
+  // attach here beyond the element itself.
+</script>
+
+<style>
+  .mode-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .mode-picker.hidden {
+    display: none;
+  }
+
+  .mode-picker__tabs {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .mode-picker__tab {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background-color: var(--color-canvas-card);
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color 0.18s ease,
+      color 0.18s ease,
+      background-color 0.18s ease;
+  }
+
+  .mode-picker__tab[aria-pressed='true'] {
+    border-color: rgba(255, 122, 23, 0.6);
+    background-color: rgba(255, 122, 23, 0.08);
+    color: var(--color-sunset-soft);
+  }
+
+  .mode-picker__tab:hover:not([aria-pressed='true']) {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: var(--color-ink);
+  }
+
+  .mode-picker__tab:active:not([aria-pressed='true']) {
+    transform: scale(0.98);
+  }
+
+  .mode-picker__description {
+    margin: 0;
+    color: var(--color-mute);
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: center;
+    text-wrap: pretty;
+  }
+
+  @media (max-width: 700px) {
+    .mode-picker__tab {
+      min-height: 44px;
+      font-size: 10px;
+    }
+    /* The start overlay already shows the active mode's rules — keep the
+       picker a compact tab strip on phones so the board stays above the fold. */
+    .mode-picker__description {
+      display: none;
+    }
+  }
+
+  /* Short landscape: keep the tabs, drop the description to save vertical space. */
+  @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {
+    /* No room for the picker next to a full-height board — the current mode is
+       already shown by the board badge and start-screen note. */
+    .mode-picker {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: 'Outfit';
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: block;
+        src: url('../public/fonts/outfit-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'DM Mono';
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url('../public/fonts/dm-mono-400-latin.woff2') format('woff2');
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #0a0a0a;
+        font-family: 'Outfit', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .frame {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        background: #0a0a0a;
+      }
+
+      /* Faint star field to echo the in-game board backdrop. */
+      .frame::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          radial-gradient(1.5px 1.5px at 120px 90px, rgba(255, 255, 255, 0.5), transparent 100%),
+          radial-gradient(1px 1px at 300px 40px, rgba(196, 181, 253, 0.5), transparent 100%),
+          radial-gradient(1px 1px at 80px 220px, rgba(255, 255, 255, 0.35), transparent 100%),
+          radial-gradient(1.5px 1.5px at 250px 180px, rgba(255, 255, 255, 0.4), transparent 100%),
+          radial-gradient(1px 1px at 520px 70px, rgba(255, 255, 255, 0.35), transparent 100%),
+          radial-gradient(1px 1px at 420px 260px, rgba(196, 181, 253, 0.4), transparent 100%),
+          radial-gradient(1.5px 1.5px at 980px 80px, rgba(255, 255, 255, 0.45), transparent 100%),
+          radial-gradient(1px 1px at 1180px 210px, rgba(255, 255, 255, 0.3), transparent 100%);
+      }
+
+      .frame::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(420px 420px at 18% 8%, rgba(255, 122, 23, 0.07), transparent 70%),
+          radial-gradient(520px 520px at 100% 110%, rgba(124, 58, 237, 0.08), transparent 70%);
+      }
+
+      .title-block {
+        position: absolute;
+        left: 64px;
+        top: 112px;
+        width: 540px;
+      }
+
+      .kicker {
+        font-family: 'DM Mono', monospace;
+        font-size: 16px;
+        font-weight: 400;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #7d8187;
+        margin-bottom: 22px;
+      }
+
+      h1 {
+        font-size: 92px;
+        font-weight: 400;
+        letter-spacing: -0.05em;
+        line-height: 0.98;
+        color: #ffffff;
+        margin-bottom: 24px;
+      }
+
+      h1 em {
+        font-style: normal;
+        color: #ff7a17;
+      }
+
+      .sub {
+        font-size: 21px;
+        line-height: 1.5;
+        color: #dadbdf;
+        max-width: 500px;
+        margin-bottom: 34px;
+      }
+
+      .meta {
+        font-family: 'DM Mono', monospace;
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        color: #7d8187;
+      }
+
+      .board {
+        position: absolute;
+        right: 62px;
+        top: 85px;
+        width: 460px;
+        height: 460px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <div class="title-block">
+        <p class="kicker">The classic arcade game</p>
+        <h1>Snake<em>Game</em></h1>
+        <p class="sub">Steer the snake, collect the fruit, grow longer — and don't hit the wall or your own tail.</p>
+        <p class="meta">Free · No download · No login · Desktop &amp; mobile</p>
+      </div>
+
+      <div class="board" aria-hidden="true">
+        <svg width="460" height="460" viewBox="0 0 460 460" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="snakeGrad" gradientUnits="userSpaceOnUse" x1="280" y1="410" x2="150" y2="170">
+              <stop offset="0" stop-color="#ff7a17" />
+              <stop offset="0.55" stop-color="#ff8a3d" />
+              <stop offset="1" stop-color="#ffc285" />
+            </linearGradient>
+            <radialGradient id="fruitGlow" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0" stop-color="#ffc285" stop-opacity="0.45" />
+              <stop offset="1" stop-color="#ff7a17" stop-opacity="0" />
+            </radialGradient>
+            <radialGradient id="fruitCore" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0" stop-color="#fff7ed" />
+              <stop offset="0.25" stop-color="#ffd9a8" />
+              <stop offset="0.6" stop-color="#ff8a3d" />
+              <stop offset="1" stop-color="#ff5f1f" />
+            </radialGradient>
+            <radialGradient id="headGrad" cx="0.35" cy="0.3" r="0.9">
+              <stop offset="0" stop-color="#ffd9a8" />
+              <stop offset="0.6" stop-color="#ff8a3d" />
+              <stop offset="1" stop-color="#ff6a1f" />
+            </radialGradient>
+            <pattern id="grid" width="38.33" height="38.33" patternUnits="userSpaceOnUse">
+              <path d="M 38.33 0 L 0 0 0 38.33" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
+            </pattern>
+            <clipPath id="boardClip">
+              <rect x="1" y="1" width="458" height="458" rx="18" />
+            </clipPath>
+          </defs>
+
+          <rect x="1" y="1" width="458" height="458" rx="18" fill="#0e0e0e" />
+          <rect x="1" y="1" width="458" height="458" fill="url(#grid)" clip-path="url(#boardClip)" />
+          <rect x="1" y="1" width="458" height="458" rx="18" stroke="#212327" stroke-width="2" />
+
+          <circle cx="95" cy="170" r="34" fill="url(#fruitGlow)" />
+          <circle cx="95" cy="170" r="12" fill="url(#fruitCore)" />
+
+          <path
+            d="M 280 410 L 280 330 L 170 330 L 170 250 L 260 250 L 260 170 L 150 170"
+            stroke="url(#snakeGrad)"
+            stroke-width="22"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+
+          <circle cx="150" cy="170" r="13" fill="url(#headGrad)" />
+          <circle cx="155" cy="164" r="4.5" fill="#fff5ea" opacity="0.85" />
+          <circle cx="143" cy="163" r="4" fill="#0a0a0a" />
+          <circle cx="143" cy="177" r="4" fill="#0a0a0a" />
+          <circle cx="139.5" cy="163" r="1.5" fill="#fff5ea" />
+          <circle cx="139.5" cy="177" r="1.5" fill="#fff5ea" />
+        </svg>
+      </div>
+    </div>
+  </body>
+</html>

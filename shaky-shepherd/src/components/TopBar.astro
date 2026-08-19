@@ -1,13 +1,12 @@
 ---
 ---
 <header class="topbar">
-  <a class="brand" href="." aria-label="Serpent home">
+  <a class="brand" href="." aria-label="Snake Game home">
     <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-    <span translate="no">SERPENT</span>
+    <span>Snake Game</span>
   </a>
   <div class="topbar-right">
-    <span class="live-dot" aria-hidden="true"></span>
-    <span class="system-label" translate="no">ARCADE PROTOCOL</span>
+    <a class="how-link" href="#how-to-play">How to play</a>
   </div>
 </header>
 
@@ -26,9 +25,9 @@
     align-items: center;
     gap: 12px;
     color: var(--color-ink);
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 500;
-    letter-spacing: 0.24em;
+    letter-spacing: 0.01em;
     text-decoration: none;
   }
 
@@ -61,33 +60,18 @@
   .topbar-right {
     display: flex;
     align-items: center;
-    gap: 10px;
-    color: var(--color-mute);
+  }
+
+  .how-link {
+    color: var(--color-body);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+    text-decoration: none;
   }
 
-  .live-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--color-sunset);
-    box-shadow: 0 0 10px var(--color-sunset);
-    animation: breathe 2.2s ease-in-out infinite;
-  }
-
-  @keyframes breathe {
-    50% {
-      opacity: 0.35;
-      box-shadow: 0 0 2px var(--color-sunset);
-    }
-  }
-
-  @media (max-width: 380px) {
-    .system-label {
-      display: none;
-    }
+  .how-link:hover {
+    color: var(--color-ink);
   }
 </style>

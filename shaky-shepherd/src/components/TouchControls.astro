@@ -89,4 +89,28 @@
     grid-column: 3;
     grid-row: 2;
   }
+
+  /* The direction pad is only meaningful for touch input, so key it off the
+     pointer type instead of viewport width. */
+  @media (pointer: fine) {
+    .touch-controls {
+      display: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .touch-controls {
+      padding: 14px;
+      border: 1px solid var(--color-hairline);
+      border-radius: var(--radius-card);
+      background: var(--color-canvas-card);
+    }
+  }
+
+  /* Short landscape: hide the pad so the board can use the full height. */
+  @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {
+    .touch-controls {
+      display: none;
+    }
+  }
 </style>

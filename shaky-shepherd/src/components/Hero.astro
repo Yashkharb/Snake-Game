@@ -6,8 +6,8 @@
     Play <em>Snake Game</em> online.
   </h1>
   <p class="subtitle">
-    The classic snake game, reborn. Thread your way through a dark digital garden, eat every solar
-    fruit, and never touch the perimeter — or yourself.
+    The classic arcade game, sharpened for your browser. Steer the snake, collect the fruit, grow
+    longer — and don't hit the wall or your own tail.
   </p>
 </section>
 
@@ -40,5 +40,55 @@
     font-size: 16px;
     line-height: 1.6;
     text-wrap: pretty;
+  }
+
+  @media (max-width: 700px) {
+    .hero {
+      padding-left: 0;
+      margin-bottom: 14px;
+    }
+    .hero-eyebrow {
+      font-size: 10px;
+    }
+    h1 {
+      margin: 10px 0 12px;
+      font-size: 34px;
+    }
+    .subtitle {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  }
+
+  /* Reclaim vertical space once a run is in progress: on small widths (mobile)
+     and on short viewports (laptop/tablet landscape) the game board + controls
+     get priority over the marketing copy. */
+  @media (max-width: 700px), (max-height: 1020px) {
+    :global(body.is-playing) .hero {
+      display: none;
+    }
+  }
+
+  /* Very narrow portrait phones: compact the hero so the Start button stays
+     above the fold. */
+  @media (max-width: 360px) {
+    .hero {
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 10px 0 12px;
+      font-size: 30px;
+    }
+    .subtitle {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  }
+
+  /* Short landscape: marketing copy never fights the board for space. */
+  @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {
+    .hero {
+      display: none;
+    }
   }
 </style>

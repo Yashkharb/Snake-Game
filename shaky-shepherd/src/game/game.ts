@@ -1,7 +1,37 @@
-interface Cell {
-  x: number;
-  y: number;
-}
+import {
+  buildShareMessage,
+  CELLS,
+  createInitialState,
+  formatCountdown,
+  formatDuration,
+  getLevel,
+  getMoveDelay,
+  queueDirection,
+  spawnFood,
+  startRun,
+  step as stepGame,
+  togglePause as togglePauseGame,
+} from './core.ts';
+import type { GameState, Vec, Cell, DeathReason } from './core.ts';
+import { DEFAULT_MODE_ID, getMode, isGameModeId } from './modes.ts';
+import type { GameMode, GameModeId } from './modes.ts';
+import {
+  buildDailyShareMessage,
+  dailyDateKey,
+  formatDailyDate,
+  generateDailyChallenge,
+} from './daily.ts';
+import type { DailyChallenge } from './daily.ts';
+import { trackEvent } from '../lib/analytics.ts';
+import type { AnalyticsParams } from '../lib/analytics.ts';
+import {
+  readPreference,
+  readStoredDailyStatus,
+  readStoredNumber,
+  writePreference,
+  writeStoredDailyStatus,
+  writeStoredNumber,
+} from './storage.ts';
 
 interface Star {
   x: number;
@@ -28,11 +58,11 @@ interface Ripple {
   hue: number;
 }
 
-type Vec = { x: number; y: number };
-
 const SIZE = 800;
-const CELLS = 20;
 const CELL = SIZE / CELLS;
+
+const MAX_PARTICLES = 120;
+const MAX_RIPPLES = 8;
 
 const DIRECTIONS: Record<string, Vec> = {
   ArrowUp: { x: 0, y: -1 },
@@ -71,7 +101,7 @@ function reportFatalError(error: unknown) {
   const banner = document.querySelector('.fatal-error') || document.createElement('p');
   banner.className = 'fatal-error';
   banner.setAttribute('role', 'alert');
-  banner.textContent = `Serpent could not run: ${error instanceof Error ? error.message : String(error)}`;
+  banner.textContent = `Snake Game could not run: ${error instanceof Error ? error.message : String(error)}`;
   document.body.append(banner);
 }
 
@@ -86,11 +116,35 @@ const levelEl = requireElement('level');
 const speedNameEl = requireElement('speed-name');
 const speedMeter = requireElement<HTMLElement>('speed-meter');
 const scoreDetail = requireElement('score-detail');
+const speedLabelEl = requireElement('speed-label');
 const startOverlay = requireElement('start-overlay');
 const pauseOverlay = requireElement('pause-overlay');
 const gameoverOverlay = requireElement('gameover-overlay');
-const gameoverMessage = requireElement('gameover-message');
+const gameoverKicker = requireElement('gameover-kicker');
+const gameoverTitle = requireElement('gameover-title');
+const finalScoreEl = requireElement('final-score');
+const finalBestEl = requireElement('final-best');
+const finalLevelEl = requireElement('final-level');
+const finalLengthEl = requireElement('final-length');
+const finalLongestEl = requireElement('final-longest');
+const finalFruitEl = requireElement('final-fruit');
+const finalDurationEl = requireElement('final-duration');
+const newBestBadge = requireElement('new-best-badge');
+const shareButton = requireElement<HTMLButtonElement>('share-button');
 const pauseButton = requireElement<HTMLButtonElement>('pause-button');
+const statusAnnouncer = requireElement('status-announcer');
+const resumeButton = requireElement<HTMLButtonElement>('resume-button');
+const modePicker = requireElement('mode-picker');
+const modeBadge = requireElement('mode-badge');
+const startModeNote = requireElement('start-mode-note');
+const startKicker = requireElement('start-kicker');
+const startTitle = requireElement('start-title');
+const startButtonLabel = requireElement('start-button-label');
+const dailyDateEl = requireElement('daily-date');
+const dailyBestEl = requireElement('daily-best');
+const copyButton = requireElement<HTMLButtonElement>('copy-button');
+const copyButtonLabel = requireElement('copy-button-label');
+const shareButtonLabel = requireElement('share-button-label');
 
 // Crisp rendering on high-density displays while keeping 800×800 logical units.
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -98,31 +152,180 @@ canvas.width = Math.round(SIZE * dpr);
 canvas.height = Math.round(SIZE * dpr);
 ctx.scale(dpr, dpr);
 
-let snake: Cell[];
-let direction: Vec;
-let turnQueue: Vec[];
-let food: Cell | null;
-let score: number;
-let running = false;
-let paused = false;
-let gameOver = false;
+let game: GameState;
+let prevSnake: Cell[] = [];
 let lastMove = 0;
 let animationFrame = 0;
 let particles: Particle[] = [];
 let ripples: Ripple[] = [];
 let stars: Star[] = [];
 let highScore = 0;
+let bestLength = 0;
 let audioCtx: AudioContext | null = null;
 let audioDisabled = false;
-let runId = 0;
+let backgroundCache: OffscreenCanvas | null = null;
+let levelUpFlash = 0;
+let runStart = 0;
+let activeRunMs = 0;
+let maxLength = 0;
+let isNewBest = false;
+let lastRunMs = 0;
+let activeMode: GameMode = getMode(readStoredModeId());
+let dailyChallenge: DailyChallenge | null = null;
+let dailyFoodIndex = 0;
+let todayKey = dailyDateKey();
+let lastShareText = '';
 
-try {
-  const stored = Number(localStorage.getItem('serpent-high-score'));
-  highScore = Number.isFinite(stored) && stored > 0 ? stored : 0;
-} catch {
-  console.warn('[serpent] high score could not be read from localStorage');
-}
+highScore = readStoredNumber(activeMode.bestKey, 0);
+bestLength = readStoredNumber(activeMode.bestLengthKey, 0);
 highScoreEl.textContent = String(highScore).padStart(3, '0');
+
+function readStoredModeId(): GameModeId {
+  const stored = readPreference('mode', DEFAULT_MODE_ID);
+  return isGameModeId(stored) ? stored : DEFAULT_MODE_ID;
+}
+
+function isRunning() {
+  return game.status === 'running';
+}
+
+function isPaused() {
+  return game.status === 'paused';
+}
+
+function isOver() {
+  return game.status === 'gameover' || game.status === 'cleared';
+}
+
+function isActive() {
+  return game.status === 'running' || game.status === 'paused';
+}
+
+// Announce discrete state changes for assistive tech without live-updating the
+// score on every tick (which would be noisy). Re-clearing forces a re-read when
+// the same state recurs (e.g. pause → pause).
+function announce(message: string) {
+  statusAnnouncer.textContent = '';
+  window.setTimeout(() => {
+    statusAnnouncer.textContent = message;
+  }, 0);
+}
+
+// Active play time for the current run, excluding pauses (frozen while paused).
+function currentRunMs(): number {
+  return activeRunMs + (runStart ? performance.now() - runStart : 0);
+}
+
+// Mode-selection UI + persistent mode indicator. The board badge and the start
+// overlay note are always kept in sync with the active mode.
+function refreshModeUI() {
+  modeBadge.textContent = activeMode.shortName;
+  startModeNote.textContent = activeMode.description;
+  refreshDailyUI();
+  updatePickerState();
+}
+
+// Daily Challenge helpers. The challenge is derived purely from the local
+// calendar date; if the date has changed (including a live midnight rollover),
+// the challenge is regenerated so "today" is always the current day.
+function ensureDailyForToday() {
+  const key = dailyDateKey();
+  todayKey = key;
+  if (dailyChallenge && dailyChallenge.dateKey === key) return;
+  dailyChallenge = generateDailyChallenge(key);
+  dailyFoodIndex = 0;
+}
+
+function refreshDailyUI() {
+  const isDaily = activeMode.id === 'daily';
+  startKicker.textContent = isDaily ? 'DAILY CHALLENGE' : 'GET READY';
+  startTitle.textContent = isDaily ? "Today's challenge" : 'Ready to play?';
+  startButtonLabel.textContent = isDaily ? 'Play challenge' : 'Start run';
+  startOverlay.classList.toggle('is-daily', isDaily);
+  dailyDateEl.hidden = !isDaily;
+  dailyBestEl.hidden = !isDaily;
+  if (isDaily) {
+    ensureDailyForToday();
+    dailyDateEl.textContent = dailyChallenge ? formatDailyDate(dailyChallenge.dateKey) : '';
+    const status = readStoredDailyStatus();
+    const today =
+      status && dailyChallenge && status.dateKey === dailyChallenge.dateKey
+        ? `TODAY ${String(status.score).padStart(3, '0')}${status.completed ? ' · COMPLETED' : ''}`
+        : '';
+    dailyBestEl.textContent = `BEST ${String(highScore).padStart(3, '0')}${today ? ` · ${today}` : ''}`;
+  }
+}
+
+// Feeds the engine the next fixed fruit from today's challenge. Returns null
+// after the last fruit, which ends the run with the board "cleared".
+function dailyFoodSource(_snake: Cell[]): Cell | null {
+  if (!dailyChallenge) return null;
+  const next = dailyFoodIndex + 1;
+  if (next >= dailyChallenge.foodSequence.length) return null;
+  return dailyChallenge.foodSequence[next];
+}
+
+function updatePickerState() {
+  document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.mode === activeMode.id));
+  });
+  const description = document.getElementById('mode-description');
+  if (description) description.textContent = activeMode.description;
+}
+
+function setModePickerVisible(visible: boolean) {
+  modePicker.classList.toggle('hidden', !visible);
+}
+
+function selectMode(id: GameModeId) {
+  if (isActive() || id === activeMode.id) return;
+  const previous = activeMode.id;
+  activeMode = getMode(id);
+  writePreference('mode', id);
+  highScore = readStoredNumber(activeMode.bestKey, 0);
+  bestLength = readStoredNumber(activeMode.bestLengthKey, 0);
+  highScoreEl.textContent = String(highScore).padStart(3, '0');
+  const fresh = createInitialState();
+  if (id === 'daily') {
+    ensureDailyForToday();
+    dailyFoodIndex = 0;
+    game = {
+      ...fresh,
+      food: dailyChallenge ? (dailyChallenge.foodSequence[0] ?? spawnFood(fresh.snake)) : spawnFood(fresh.snake),
+    };
+  } else {
+    game = { ...fresh, food: spawnFood(fresh.snake) };
+  }
+  prevSnake = game.snake.map((s) => ({ ...s }));
+  lastMove = 0;
+  cancelAnimationFrame(animationFrame);
+  animationFrame = 0;
+  particles = [];
+  ripples = [];
+  pauseOverlay.classList.add('hidden');
+  gameoverOverlay.classList.add('hidden');
+  startOverlay.classList.remove('hidden');
+  pauseButton.disabled = true;
+  refreshModeUI();
+  updateHud();
+  drawBackground(0);
+  drawFood(0);
+  drawSnake(0);
+  trackEvent('mode_select', { mode: activeMode.id, previous_mode: previous });
+}
+
+// Shared GA event params. `duration` is active play time (excludes pauses),
+// measured from the run clock; callers can override via `extra`.
+function eventParams(extra: AnalyticsParams = {}): AnalyticsParams {
+  return {
+    score: game.score,
+    level: getLevel(game.score),
+    snake_length: game.snake.length,
+    duration: Math.round(currentRunMs() / 1000),
+    mode: activeMode.id,
+    ...extra,
+  };
+}
 
 function createStars() {
   const count = reducedMotion ? 40 : 100;
@@ -136,232 +339,457 @@ function createStars() {
 }
 
 function resetGame() {
-  snake = [
-    { x: 10, y: 12 },
-    { x: 9, y: 12 },
-    { x: 8, y: 12 },
-    { x: 7, y: 12 },
-  ];
-  direction = { x: 1, y: 0 };
-  turnQueue = [];
-  score = 0;
+  prevSnake = game.snake.map(s => ({ ...s }));
+  if (activeMode.id === 'daily') {
+    ensureDailyForToday();
+    dailyFoodIndex = 0;
+    const base = startRun(game);
+    game = {
+      ...base,
+      food: dailyChallenge ? (dailyChallenge.foodSequence[0] ?? spawnFood(base.snake)) : base.food,
+    };
+  } else {
+    game = startRun(game);
+  }
   particles = [];
   ripples = [];
-  food = spawnFood();
+  levelUpFlash = 0;
   updateHud();
-}
-
-function spawnFood(): Cell | null {
-  const openCells: Cell[] = [];
-  for (let x = 1; x < CELLS - 1; x++) {
-    for (let y = 1; y < CELLS - 1; y++) {
-      if (!snake.some((s) => s.x === x && s.y === y)) openCells.push({ x, y });
-    }
-  }
-  if (!openCells.length) return null;
-  return openCells[Math.floor(Math.random() * openCells.length)];
-}
-
-function getLevel() {
-  return Math.min(12, 1 + Math.floor(score / 40));
-}
-
-function getMoveDelay() {
-  return Math.max(50, 105 - (getLevel() - 1) * 6);
 }
 
 function startGame() {
   cancelAnimationFrame(animationFrame);
-  runId += 1;
+  animationFrame = 0;
+  if (activeMode.id === 'daily') refreshDailyUI();
   resetGame();
+  activeRunMs = 0;
+  maxLength = game.snake.length;
+  runStart = performance.now();
   document.body.classList.add('is-playing');
-  running = true;
-  paused = false;
-  gameOver = false;
-  lastMove = performance.now() - getMoveDelay();
+  lastMove = performance.now() - getMoveDelay(game.score);
+  setModePickerVisible(false);
   startOverlay.classList.add('hidden');
   pauseOverlay.classList.add('hidden');
   gameoverOverlay.classList.add('hidden');
   pauseButton.disabled = false;
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   animate(performance.now());
+  announce(`Game started. Score ${game.score}, level ${String(getLevel(game.score)).padStart(2, '0')}.`);
   playTone(220, 0.035, 'sine');
+  trackEvent('game_start', eventParams());
 }
 
 function togglePause() {
-  if (!running || gameOver) return;
-  paused = !paused;
-  pauseOverlay.classList.toggle('hidden', !paused);
-  pauseButton.innerHTML = paused
+  const next = togglePauseGame(game);
+  if (next === game) return;
+  game = next;
+  const pausedNow = isPaused();
+  if (pausedNow) {
+    activeRunMs += performance.now() - runStart;
+    runStart = 0;
+  } else {
+    runStart = performance.now();
+  }
+  pauseOverlay.classList.toggle('hidden', !pausedNow);
+  pauseButton.innerHTML = pausedNow
     ? '<span class="pause-icon" aria-hidden="true">▶</span><span>RESUME</span><kbd class="keycap" translate="no">P</kbd>'
     : '<span class="pause-icon" aria-hidden="true">Ⅱ</span><span>PAUSE</span><kbd class="keycap" translate="no">P</kbd>';
-  if (!paused) {
+  if (pausedNow) {
+    announce('Game paused.');
+    resumeButton.focus();
+    trackEvent('pause', eventParams());
+  } else {
+    announce('Game resumed.');
     lastMove = performance.now();
-    animate(lastMove);
+    prevSnake = game.snake.map(s => ({ ...s }));
+    pauseButton.focus();
+    updateHud();
+    trackEvent('resume', eventParams());
   }
 }
 
 function setDirection(next: Vec) {
-  if (!running || paused || gameOver) return;
-  const lastPlanned = turnQueue[turnQueue.length - 1] || direction;
-  if (
-    (next.x === lastPlanned.x && next.y === lastPlanned.y) ||
-    (next.x === -lastPlanned.x && next.y === -lastPlanned.y)
-  ) {
-    return;
-  }
-  if (turnQueue.length < 2) turnQueue.push({ ...next });
+  game = queueDirection(game, next);
 }
 
 function move() {
-  direction = turnQueue.shift() || direction;
-  const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
-  if (
-    head.x < 0 ||
-    head.x >= CELLS ||
-    head.y < 0 ||
-    head.y >= CELLS ||
-    snake.some((part) => part.x === head.x && part.y === head.y)
-  ) {
-    endGame();
+  prevSnake = game.snake.map(s => ({ ...s }));
+  const prevLevel = getLevel(game.score);
+  const { state: next, ate } = stepGame(game, {
+    rng: Math.random,
+    wrap: activeMode.rules.wrap,
+    pointsPerFruit: activeMode.scoring.pointsPerFruit,
+    foodSource: activeMode.id === 'daily' ? dailyFoodSource : undefined,
+  });
+  game = next;
+  if (ate) dailyFoodIndex += 1;
+  maxLength = Math.max(maxLength, game.snake.length);
+  const newLevel = getLevel(game.score);
+  if (newLevel > prevLevel) {
+    levelUpFlash = 1.0;
+    playTone(440, 0.12, 'sine');
+    window.setTimeout(() => playTone(554, 0.12, 'sine'), 80);
+    window.setTimeout(() => playTone(659, 0.18, 'sine'), 160);
+    trackEvent('level_up', eventParams({ level: newLevel }));
+  }
+  if (next.status === 'gameover') {
+    endGame(next.deathReason || 'wall');
+    updateHud();
     return;
   }
-  snake.unshift(head);
-  if (food && head.x === food.x && head.y === food.y) {
-    score += 10;
+  if (next.status === 'cleared') {
+    endGame('cleared');
+    updateHud();
+    return;
+  }
+  if (ate) {
+    const head = next.snake[0];
     makeBurst((head.x + 0.5) * CELL, (head.y + 0.5) * CELL, '#ffc285', 22);
     ripples.push({ x: (head.x + 0.5) * CELL, y: (head.y + 0.5) * CELL, age: 0, hue: 28 });
-    food = spawnFood();
-    updateHud();
-    playTone(380 + score * 1.5, 0.055, 'triangle');
-    if (!food) {
-      endGame('cleared');
-      return;
+    playTone(380 + next.score * 1.5, 0.055, 'triangle');
+  }
+  updateHud();
+}
+
+function setShareButtonText(text: string) {
+  shareButtonLabel.textContent = text;
+}
+
+function setCopyButtonText(text: string) {
+  copyButtonLabel.textContent = text;
+}
+
+async function shareScore() {
+  const text = lastShareText;
+  const base = eventParams({ is_new_best: isNewBest, duration: Math.round(lastRunMs / 1000) });
+  let method: 'web-share' | 'clipboard' | 'unsupported' = 'unsupported';
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'Snake Game', text, url: window.location.href });
+      method = 'web-share';
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      method = 'clipboard';
+      setShareButtonText('Copied!');
     }
-  } else {
-    snake.pop();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        method = 'clipboard';
+        setShareButtonText('Copied!');
+      } catch {
+        method = 'unsupported';
+      }
+    } else {
+      method = 'unsupported';
+    }
+  }
+  if (method === 'clipboard') {
+    window.setTimeout(() => setShareButtonText(activeMode.id === 'daily' ? 'Share result' : 'Share score'), 1600);
+  }
+  trackEvent('share_score', { ...base, share_method: method });
+}
+
+async function copyResult() {
+  if (!navigator.clipboard || !navigator.clipboard.writeText || !lastShareText) return;
+  try {
+    await navigator.clipboard.writeText(lastShareText);
+    setCopyButtonText('Copied!');
+    window.setTimeout(() => setCopyButtonText('Copy result'), 1600);
+    trackEvent('share_score', { ...eventParams({ is_new_best: isNewBest, duration: Math.round(lastRunMs / 1000) }), share_method: 'copy_result' });
+  } catch (error) {
+    console.warn('[serpent] copy failed:', error);
   }
 }
 
-function endGame(reason?: 'cleared') {
-  running = false;
-  gameOver = true;
+function endGame(reason: DeathReason | 'cleared' = 'wall') {
   pauseButton.disabled = true;
-  makeBurst((snake[0].x + 0.5) * CELL, (snake[0].y + 0.5) * CELL, '#c4b5fd', 55);
-  const endedRun = runId;
+  makeBurst((game.snake[0].x + 0.5) * CELL, (game.snake[0].y + 0.5) * CELL, '#c4b5fd', 55);
+  const endedRun = game.runId;
+
+  const durationMs = activeRunMs + (runStart ? performance.now() - runStart : 0);
+  activeRunMs = 0;
+  runStart = 0;
+  lastRunMs = durationMs;
+
+  const fruitCount = game.score / activeMode.scoring.pointsPerFruit;
+  const length = game.snake.length;
+  isNewBest = game.score > highScore;
+
+  if (isNewBest) {
+    highScore = game.score;
+    highScoreEl.textContent = String(highScore).padStart(3, '0');
+    writeStoredNumber(activeMode.bestKey, highScore);
+  }
+  if (maxLength > bestLength) {
+    bestLength = maxLength;
+    writeStoredNumber(activeMode.bestLengthKey, bestLength);
+  }
+
+  finalScoreEl.textContent = String(game.score).padStart(3, '0');
+  finalBestEl.textContent = String(highScore).padStart(3, '0');
+  finalLevelEl.textContent = String(getLevel(game.score)).padStart(2, '0');
+  finalLengthEl.textContent = String(length);
+  finalLongestEl.textContent = String(maxLength);
+  finalFruitEl.textContent = String(fruitCount);
+  finalDurationEl.textContent = formatDuration(durationMs);
+  newBestBadge.classList.toggle('is-new-best', isNewBest);
+
+  const cleared = reason === 'cleared';
+  const isDaily = activeMode.id === 'daily';
+  const completed = cleared && isDaily;
+  gameoverKicker.textContent = cleared
+    ? isDaily
+      ? 'CHALLENGE COMPLETE'
+      : 'BOARD CLEARED'
+    : isDaily
+      ? 'DAILY CHALLENGE'
+      : reason === 'time'
+        ? 'TIME UP'
+        : 'RUN OVER';
+  gameoverTitle.textContent =
+    cleared
+      ? isDaily
+        ? "You cleared today's challenge!"
+        : 'You cleared the whole board!'
+      : reason === 'time'
+        ? "Time's up — great run!"
+        : reason === 'self'
+          ? 'You ran into yourself.'
+          : 'You hit the wall.';
+
+  if (isDaily) {
+    writeStoredDailyStatus({
+      dateKey: todayKey,
+      score: game.score,
+      completed,
+      level: getLevel(game.score),
+      durationMs,
+      length,
+    });
+  }
+
+  const shareSupported = Boolean(navigator.share || (navigator.clipboard && navigator.clipboard.writeText));
+  const canCopy = Boolean(navigator.clipboard && navigator.clipboard.writeText);
+  lastShareText = isDaily && dailyChallenge
+    ? buildDailyShareMessage(dailyChallenge.dateKey, game.score, isNewBest, completed)
+    : buildShareMessage(game.score, isNewBest);
+  shareButton.hidden = !shareSupported;
+  copyButton.hidden = !isDaily || !canCopy;
+  setShareButtonText(isDaily ? 'Share result' : 'Share score');
+  setCopyButtonText('Copy result');
+
   window.setTimeout(() => {
-    if (endedRun === runId && gameOver) {
+    if (endedRun === game.runId && isOver()) {
       gameoverOverlay.classList.remove('hidden');
       document.getElementById('restart-button')?.focus();
     }
   }, 390);
-  const fruitCount = score / 10;
-  gameoverMessage.textContent =
-    reason === 'cleared'
-      ? `You cleared the garden with ${fruitCount} solar fruits at level ${String(getLevel()).padStart(2, '0')}.`
-      : `You gathered ${fruitCount} solar fruit${fruitCount === 1 ? '' : 's'} and reached level ${String(getLevel()).padStart(2, '0')}.`;
-  if (score > highScore) {
-    highScore = score;
-    highScoreEl.textContent = String(highScore).padStart(3, '0');
-    try {
-      localStorage.setItem('serpent-high-score', String(highScore));
-    } catch {
-      console.warn('[serpent] high score could not be saved to localStorage');
-    }
+
+  const reasonText =
+    cleared
+      ? 'You cleared the whole board.'
+      : reason === 'time'
+        ? "Time's up."
+        : reason === 'self'
+          ? 'You ran into yourself.'
+          : 'You hit the wall.';
+  announce(
+    `Game over. ${reasonText} Score ${game.score}, best ${highScore}, level ${String(getLevel(game.score)).padStart(2, '0')}, length ${length}, time ${formatDuration(durationMs)}.`,
+  );
+
+  const deathReason = cleared ? 'cleared' : (reason ?? 'wall');
+  trackEvent('game_over', eventParams({ is_new_best: isNewBest, death_reason: deathReason, duration: Math.round(durationMs / 1000) }));
+  if (isNewBest) {
+    trackEvent('new_high_score', eventParams({ is_new_best: true, death_reason: deathReason, duration: Math.round(durationMs / 1000) }));
   }
   playTone(110, 0.18, 'sawtooth');
   window.setTimeout(() => playTone(73, 0.25, 'sawtooth'), 100);
+  setModePickerVisible(true);
 }
 
 function updateHud() {
-  const level = getLevel();
-  scoreEl.textContent = String(score).padStart(3, '0');
-  levelEl.textContent = String(level).padStart(2, '0');
-  speedNameEl.textContent = SPEED_LABELS[Math.min(SPEED_LABELS.length - 1, Math.floor((level - 1) / 2))];
-  speedMeter.style.width = `${Math.min(100, 12 + (level - 1) * 8)}%`;
-  scoreDetail.textContent = score ? `${snake.length} SEGMENTS SYNCHRONIZED` : 'FIND THE FIRST ORB';
+  scoreEl.textContent = String(game.score).padStart(3, '0');
+  const timeLimit = activeMode.rules.timeLimitMs;
+  if (timeLimit != null) {
+    // Time Attack: the speed card becomes a clear, always-visible countdown.
+    const remaining = Math.max(0, timeLimit - currentRunMs());
+    speedLabelEl.textContent = 'TIME';
+    levelEl.textContent = formatCountdown(remaining);
+    speedNameEl.hidden = true;
+    speedMeter.style.width = `${Math.min(100, (remaining / timeLimit) * 100)}%`;
+    scoreDetail.textContent = `TARGET ${formatCountdown(timeLimit)}`;
+  } else {
+    const level = getLevel(game.score);
+    speedLabelEl.textContent = 'SPEED';
+    levelEl.textContent = String(level).padStart(2, '0');
+    speedNameEl.hidden = false;
+    speedNameEl.textContent = SPEED_LABELS[Math.min(SPEED_LABELS.length - 1, Math.floor((level - 1) / 2))];
+    speedMeter.style.width = `${Math.min(100, 12 + (level - 1) * 8)}%`;
+    scoreDetail.textContent = game.score ? `LENGTH ${game.snake.length}` : 'EAT FRUIT TO SCORE';
+  }
 }
 
-function drawBackground(time: number) {
-  ctx.clearRect(0, 0, SIZE, SIZE);
-  const backdrop = ctx.createRadialGradient(SIZE * 0.5, SIZE * 0.45, 0, SIZE * 0.5, SIZE * 0.47, SIZE * 0.75);
+function createBackgroundCache() {
+  if (typeof OffscreenCanvas === 'undefined') return null;
+  const offscreen = new OffscreenCanvas(SIZE, SIZE);
+  const octx = offscreen.getContext('2d');
+  if (!octx) return null;
+
+  const backdrop = octx.createRadialGradient(SIZE * 0.5, SIZE * 0.45, 0, SIZE * 0.5, SIZE * 0.47, SIZE * 0.75);
   backdrop.addColorStop(0, '#171717');
   backdrop.addColorStop(0.56, '#0e0e0e');
   backdrop.addColorStop(1, '#0a0a0a');
-  ctx.fillStyle = backdrop;
-  ctx.fillRect(0, 0, SIZE, SIZE);
+  octx.fillStyle = backdrop;
+  octx.fillRect(0, 0, SIZE, SIZE);
 
-  const warm = ctx.createRadialGradient(-40, -40, 0, -40, -40, SIZE * 0.55);
+  const warm = octx.createRadialGradient(-40, -40, 0, -40, -40, SIZE * 0.55);
   warm.addColorStop(0, 'rgba(255, 122, 23, 0.05)');
   warm.addColorStop(1, 'rgba(255, 122, 23, 0)');
-  ctx.fillStyle = warm;
-  ctx.fillRect(0, 0, SIZE, SIZE);
+  octx.fillStyle = warm;
+  octx.fillRect(0, 0, SIZE, SIZE);
 
-  const cool = ctx.createRadialGradient(SIZE + 40, SIZE + 40, 0, SIZE + 40, SIZE + 40, SIZE * 0.6);
+  const cool = octx.createRadialGradient(SIZE + 40, SIZE + 40, 0, SIZE + 40, SIZE + 40, SIZE * 0.6);
   cool.addColorStop(0, 'rgba(124, 58, 237, 0.05)');
   cool.addColorStop(1, 'rgba(124, 58, 237, 0)');
-  ctx.fillStyle = cool;
-  ctx.fillRect(0, 0, SIZE, SIZE);
+  octx.fillStyle = cool;
+  octx.fillRect(0, 0, SIZE, SIZE);
 
   for (const star of stars) {
-    const flicker = reducedMotion ? 0.5 : 0.22 + (Math.sin(time * 0.0016 + star.phase) + 1) * 0.16;
-    ctx.fillStyle = `rgba(${star.tone}, ${flicker})`;
-    ctx.beginPath();
-    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-    ctx.fill();
+    const flicker = reducedMotion ? 0.5 : 0.22;
+    octx.fillStyle = `rgba(${star.tone}, ${flicker})`;
+    octx.beginPath();
+    octx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+    octx.fill();
   }
 
-  ctx.lineWidth = 1;
+  octx.lineWidth = 1;
   for (let i = 0; i <= CELLS; i++) {
     const pos = i * CELL;
-    ctx.strokeStyle = i % 5 === 0 ? 'rgba(255, 255, 255, 0.09)' : 'rgba(255, 255, 255, 0.04)';
-    ctx.beginPath();
-    ctx.moveTo(pos, 0);
-    ctx.lineTo(pos, SIZE);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, pos);
-    ctx.lineTo(SIZE, pos);
-    ctx.stroke();
+    octx.strokeStyle = i % 5 === 0 ? 'rgba(255, 255, 255, 0.09)' : 'rgba(255, 255, 255, 0.04)';
+    octx.beginPath();
+    octx.moveTo(pos, 0);
+    octx.lineTo(pos, SIZE);
+    octx.stroke();
+    octx.beginPath();
+    octx.moveTo(0, pos);
+    octx.lineTo(SIZE, pos);
+    octx.stroke();
   }
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+  octx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+  octx.lineWidth = 2;
+  octx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+
+  return offscreen;
+}
+
+function drawBackground(time: number) {
+  if (backgroundCache) {
+    ctx.drawImage(backgroundCache, 0, 0);
+    if (!reducedMotion) {
+      for (const star of stars) {
+        const flicker = 0.22 + (Math.sin(time * 0.0016 + star.phase) + 1) * 0.16;
+        ctx.fillStyle = `rgba(${star.tone}, ${flicker})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else {
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    const backdrop = ctx.createRadialGradient(SIZE * 0.5, SIZE * 0.45, 0, SIZE * 0.5, SIZE * 0.47, SIZE * 0.75);
+    backdrop.addColorStop(0, '#171717');
+    backdrop.addColorStop(0.56, '#0e0e0e');
+    backdrop.addColorStop(1, '#0a0a0a');
+    ctx.fillStyle = backdrop;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    const warm = ctx.createRadialGradient(-40, -40, 0, -40, -40, SIZE * 0.55);
+    warm.addColorStop(0, 'rgba(255, 122, 23, 0.05)');
+    warm.addColorStop(1, 'rgba(255, 122, 23, 0)');
+    ctx.fillStyle = warm;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    const cool = ctx.createRadialGradient(SIZE + 40, SIZE + 40, 0, SIZE + 40, SIZE + 40, SIZE * 0.6);
+    cool.addColorStop(0, 'rgba(124, 58, 237, 0.05)');
+    cool.addColorStop(1, 'rgba(124, 58, 237, 0)');
+    ctx.fillStyle = cool;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    for (const star of stars) {
+      const flicker = reducedMotion ? 0.5 : 0.22 + (Math.sin(time * 0.0016 + star.phase) + 1) * 0.16;
+      ctx.fillStyle = `rgba(${star.tone}, ${flicker})`;
+      ctx.beginPath();
+      ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= CELLS; i++) {
+      const pos = i * CELL;
+      ctx.strokeStyle = i % 5 === 0 ? 'rgba(255, 255, 255, 0.09)' : 'rgba(255, 255, 255, 0.04)';
+      ctx.beginPath();
+      ctx.moveTo(pos, 0);
+      ctx.lineTo(pos, SIZE);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, pos);
+      ctx.lineTo(SIZE, pos);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+  }
+
+  if (levelUpFlash > 0) {
+    levelUpFlash -= 1 / 60;
+    const alpha = Math.min(1, levelUpFlash) * 0.18;
+    ctx.fillStyle = `rgba(255, 214, 168, ${alpha})`;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+  }
 }
 
 function drawFood(time: number) {
+  const food = game.food;
   if (!food) return;
   const x = (food.x + 0.5) * CELL;
   const y = (food.y + 0.5) * CELL;
   const pulse = reducedMotion ? 1 : 1 + Math.sin(time * 0.005) * 0.1;
-  const aura = ctx.createRadialGradient(x, y, 0, x, y, CELL * 1.45 * pulse);
+  const auraRadius = CELL * 1.45 * pulse;
+  const aura = ctx.createRadialGradient(x, y, 0, x, y, auraRadius);
   aura.addColorStop(0, 'rgba(255, 194, 133, 0.38)');
   aura.addColorStop(0.3, 'rgba(255, 122, 23, 0.18)');
   aura.addColorStop(1, 'rgba(255, 122, 23, 0)');
   ctx.fillStyle = aura;
-  ctx.fillRect(x - CELL * 1.5, y - CELL * 1.5, CELL * 3, CELL * 3);
+  ctx.fillRect(x - auraRadius, y - auraRadius, auraRadius * 2, auraRadius * 2);
 
-  ctx.save();
-  ctx.translate(x, y);
-  if (!reducedMotion) ctx.rotate(time * 0.0012);
-  for (let i = 0; i < 8; i++) {
-    ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = i % 2 ? '#ff7a17' : '#ffc285';
-    ctx.globalAlpha = 0.77;
-    ctx.beginPath();
-    ctx.ellipse(0, -CELL * 0.27, CELL * 0.09, CELL * 0.2, 0, 0, Math.PI * 2);
-    ctx.fill();
+  if (!reducedMotion) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(time * 0.0012);
+    for (let i = 0; i < 8; i++) {
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = i % 2 ? '#ff7a17' : '#ffc285';
+      ctx.globalAlpha = 0.77;
+      ctx.beginPath();
+      ctx.ellipse(0, -CELL * 0.27, CELL * 0.09, CELL * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
-  const core = ctx.createRadialGradient(x - 4, y - 5, 1, x, y, 14);
+  const coreRadius = 13 * pulse;
+  const core = ctx.createRadialGradient(x - 4, y - 5, 1, x, y, coreRadius);
   core.addColorStop(0, '#fff7ed');
   core.addColorStop(0.22, '#ffd9a8');
   core.addColorStop(0.58, '#ff8a3d');
   core.addColorStop(1, '#ff5f1f');
   ctx.fillStyle = core;
   ctx.beginPath();
-  ctx.arc(x, y, 13 * pulse, 0, Math.PI * 2);
+  ctx.arc(x, y, coreRadius, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -369,71 +797,102 @@ function segmentHue(i: number, total: number) {
   return 24 + (Math.min(i, total - 1) / (total - 1)) * 238;
 }
 
-function drawSnake() {
-  const segments = snake.map((current, index) => ({
-    x: (current.x + 0.5) * CELL,
-    y: (current.y + 0.5) * CELL,
-    index,
-  }));
-  if (!segments.length) return;
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function drawSnake(interp: number) {
+  const curr = game.snake;
+  const prev = prevSnake.length === curr.length ? prevSnake : curr;
+  const total = curr.length;
+  if (!total) return;
+
+  const segments: { x: number; y: number; px: number; py: number; index: number }[] = [];
+  for (let i = 0; i < total; i++) {
+    const c = curr[i];
+    const p = prev[i] || c;
+    segments.push({
+      x: (c.x + 0.5) * CELL,
+      y: (c.y + 0.5) * CELL,
+      px: (p.x + 0.5) * CELL,
+      py: (p.y + 0.5) * CELL,
+      index: i,
+    });
+  }
+
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const total = segments.length;
 
-  for (let i = segments.length - 1; i > 0; i--) {
+  if (!reducedMotion) {
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(255, 122, 23, 0.35)';
+  }
+
+  for (let i = total - 1; i > 0; i--) {
     const a = segments[i];
     const b = segments[i - 1];
-    const width = Math.max(15, CELL * (0.66 - Math.min(i, 11) * 0.014));
-    const trail = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-    trail.addColorStop(0, `hsla(${segmentHue(i, total)}, 85%, ${47 + Math.min(i, 8)}%, 0.78)`);
-    trail.addColorStop(1, `hsla(${segmentHue(i - 1, total)}, 88%, 62%, 0.96)`);
-    ctx.strokeStyle = trail;
+    const ix = lerp(a.px, a.x, interp);
+    const iy = lerp(a.py, a.y, interp);
+    const jx = lerp(b.px, b.x, interp);
+    const jy = lerp(b.py, b.y, interp);
+    const width = Math.max(14, CELL * (0.64 - Math.min(i, 10) * 0.012));
+    const hue0 = segmentHue(i, total);
+    const hue1 = segmentHue(i - 1, total);
+    ctx.strokeStyle = `hsl(${lerp(hue0, hue1, 0.5)} 85% 55%)`;
     ctx.lineWidth = width;
-    ctx.shadowBlur = 13;
-    ctx.shadowColor = i < 5 ? 'rgba(255, 122, 23, 0.9)' : 'rgba(124, 58, 237, 0.9)';
+    ctx.globalAlpha = i < 5 ? 0.95 : 0.85;
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    ctx.moveTo(ix, iy);
+    ctx.lineTo(jx, jy);
     ctx.stroke();
   }
 
   ctx.shadowBlur = 0;
-  for (let i = segments.length - 1; i >= 0; i--) {
+  ctx.globalAlpha = 1;
+
+  for (let i = total - 1; i >= 0; i--) {
     const s = segments[i];
-    const r = Math.max(7, CELL * (0.3 - Math.min(i, 12) * 0.006));
+    const ix = lerp(s.px, s.x, interp);
+    const iy = lerp(s.py, s.y, interp);
+    const r = Math.max(6, CELL * (0.28 - Math.min(i, 10) * 0.005));
     const hue = segmentHue(i, total);
-    const grad = ctx.createRadialGradient(s.x - r * 0.3, s.y - r * 0.4, 1, s.x, s.y, r * 1.2);
-    grad.addColorStop(0, i === 0 ? '#fff5ea' : `hsl(${hue} 92% 70%)`);
-    grad.addColorStop(0.25, i === 0 ? '#ffb06b' : `hsl(${hue} 88% 48%)`);
-    grad.addColorStop(1, i === 0 ? '#ff5f1f' : `hsl(${hue} 78% 24%)`);
-    ctx.fillStyle = grad;
+    const lightness = i === 0 ? 60 : 45 + Math.min(i, 8) * 2;
+    ctx.fillStyle = `hsl(${hue} 85% ${lightness}%)`;
     ctx.beginPath();
-    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+    ctx.arc(ix, iy, r, 0, Math.PI * 2);
     ctx.fill();
-    if (i % 2 === 0 && i > 1) {
-      ctx.fillStyle = 'rgba(255, 250, 245, 0.36)';
+
+    if (i === 0) {
+      ctx.fillStyle = '#fff5ea';
       ctx.beginPath();
-      ctx.arc(s.x - r * 0.2, s.y - r * 0.28, r * 0.16, 0, Math.PI * 2);
+      ctx.arc(ix - r * 0.15, iy - r * 0.2, r * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (i % 3 === 0) {
+      ctx.fillStyle = 'rgba(255, 250, 245, 0.25)';
+      ctx.beginPath();
+      ctx.arc(ix - r * 0.18, iy - r * 0.25, r * 0.15, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
   const head = segments[0];
-  const ex = direction.x;
-  const ey = direction.y;
-  const sx = -direction.y;
-  const sy = direction.x;
+  const hx = lerp(head.px, head.x, interp);
+  const hy = lerp(head.py, head.y, interp);
+  const ex = game.direction.x;
+  const ey = game.direction.y;
+  const sx = -game.direction.y;
+  const sy = game.direction.x;
   for (const side of [-1, 1]) {
-    const eyeX = head.x + ex * 7 + sx * side * 7;
-    const eyeY = head.y + ey * 7 + sy * side * 7;
+    const eyeX = hx + ex * 7 + sx * side * 7;
+    const eyeY = hy + ey * 7 + sy * side * 7;
     ctx.fillStyle = '#0a0a0a';
     ctx.beginPath();
-    ctx.arc(eyeX, eyeY, 4.1, 0, Math.PI * 2);
+    ctx.arc(eyeX, eyeY, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#fff5ea';
     ctx.beginPath();
-    ctx.arc(eyeX + ex * 1.2, eyeY + ey * 1.2, 1.35, 0, Math.PI * 2);
+    ctx.arc(eyeX + ex * 1.2, eyeY + ey * 1.2, 1.3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -441,7 +900,9 @@ function drawSnake() {
 
 function makeBurst(x: number, y: number, color: string, count: number) {
   const actual = reducedMotion ? Math.round(count * 0.5) : count;
-  for (let i = 0; i < actual; i++) {
+  const remaining = MAX_PARTICLES - particles.length;
+  const toAdd = Math.min(actual, Math.max(0, remaining));
+  for (let i = 0; i < toAdd; i++) {
     const angle = Math.random() * Math.PI * 2;
     const velocity = 1.2 + Math.random() * 5;
     particles.push({ x, y, vx: Math.cos(angle) * velocity, vy: Math.sin(angle) * velocity, life: 1, size: 1 + Math.random() * 3, color });
@@ -465,6 +926,7 @@ function drawEffects() {
     ctx.fill();
   }
   ripples = ripples.filter((r) => r.age < 1);
+  if (ripples.length > MAX_RIPPLES) ripples.length = MAX_RIPPLES;
   for (const r of ripples) {
     r.age += reducedMotion ? 0.04 : 0.023;
     ctx.globalAlpha = 1 - r.age;
@@ -479,30 +941,37 @@ function drawEffects() {
 
 function animate(time: number) {
   try {
-    step(time);
+    tick(time);
   } catch (error) {
-    running = false;
-    paused = false;
-    gameOver = true;
+    game = { ...game, status: 'gameover' };
     cancelAnimationFrame(animationFrame);
     pauseButton.disabled = true;
     reportFatalError(error);
   }
 }
 
-function step(time: number) {
+function tick(time: number) {
+  if (isRunning() && activeMode.rules.timeLimitMs != null && currentRunMs() >= activeMode.rules.timeLimitMs) {
+    game = { ...game, status: 'gameover', deathReason: 'time' };
+    endGame('time');
+    updateHud();
+  }
+  const moveDelay = getMoveDelay(game.score);
   const elapsed = time - lastMove;
-  if (running && !paused && elapsed >= getMoveDelay()) {
-    const moveDelay = getMoveDelay();
+  let interp = 0;
+  if (isRunning() && moveDelay > 0) {
+    interp = Math.min(1, elapsed / moveDelay);
+  }
+  if (isRunning() && elapsed >= moveDelay) {
     move();
     lastMove += moveDelay;
     if (time - lastMove > moveDelay) lastMove = time;
   }
   drawBackground(time);
   drawFood(time);
-  drawSnake();
+  drawSnake(interp);
   drawEffects();
-  if (running || particles.length) animationFrame = requestAnimationFrame(animate);
+  if (isActive() || particles.length || ripples.length) animationFrame = requestAnimationFrame(animate);
 }
 
 function playTone(frequency: number, duration: number, type: OscillatorType) {
@@ -533,7 +1002,7 @@ function wireInput() {
   document.addEventListener('keydown', (event) => {
     if (event.code === 'Space') {
       event.preventDefault();
-      if (!running || gameOver) startGame();
+      if (game.status === 'idle' || isOver()) startGame();
       else togglePause();
       return;
     }
@@ -555,6 +1024,19 @@ function wireInput() {
   requireElement('restart-button').addEventListener('click', startGame);
   requireElement('resume-button').addEventListener('click', togglePause);
   pauseButton.addEventListener('click', togglePause);
+  shareButton.addEventListener('click', () => {
+    shareScore().catch((error) => console.warn('[serpent] share failed:', error));
+  });
+  copyButton.addEventListener('click', () => {
+    copyResult().catch((error) => console.warn('[serpent] copy failed:', error));
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const id = button.dataset.mode;
+      if (id && isGameModeId(id)) selectMode(id);
+    });
+  });
 
   let touchStart: { x: number; y: number } | undefined;
   let activePointerId: number | undefined;
@@ -603,23 +1085,67 @@ function wireInput() {
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && running && !paused && !gameOver) togglePause();
+    if (document.hidden && isRunning()) togglePause();
   });
   window.addEventListener('blur', () => {
-    if (running && !paused && !gameOver) togglePause();
+    if (isRunning()) togglePause();
   });
 }
 
 export function mountGame() {
   try {
     createStars();
-    resetGame();
+    backgroundCache = createBackgroundCache();
+    ensureDailyForToday();
+    const initial = createInitialState();
+    if (activeMode.id === 'daily') {
+      game = {
+        ...initial,
+        food: dailyChallenge ? (dailyChallenge.foodSequence[0] ?? spawnFood(initial.snake)) : spawnFood(initial.snake),
+      };
+    } else {
+      game = { ...initial, food: spawnFood(initial.snake) };
+    }
+    prevSnake = game.snake.map(s => ({ ...s }));
     wireInput();
+    ensureDailyForToday();
+    refreshModeUI();
+    setModePickerVisible(true);
+    scheduleMidnightRefresh();
+    updateHud();
     drawBackground(0);
     drawFood(0);
-    drawSnake();
+    drawSnake(0);
+    if (import.meta.env.DEV) {
+      (window as unknown as { __serpent?: object }).__serpent = {
+        getGame: () => game,
+        getMode: () => activeMode.id,
+        getDaily: () => dailyChallenge,
+        getDailyFoodIndex: () => dailyFoodIndex,
+        getTodayKey: () => todayKey,
+        selectMode: (id: string) => {
+          if (isGameModeId(id)) selectMode(id);
+        },
+      };
+    }
   } catch (error) {
     reportFatalError(error);
     throw error;
   }
+}
+
+// The challenge must flip automatically at the next local midnight even if the
+// tab stays open. When idle the start overlay refreshes immediately; a run in
+// progress is never interrupted — the next start regenerates for the new day.
+function scheduleMidnightRefresh() {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 50);
+  const delay = Math.max(1000, next.getTime() - now.getTime());
+  window.setTimeout(() => {
+    if (activeMode.id === 'daily' && !isActive()) {
+      ensureDailyForToday();
+      refreshDailyUI();
+    }
+    scheduleMidnightRefresh();
+  }, delay);
 }

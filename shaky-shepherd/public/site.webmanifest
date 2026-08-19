@@ -1,7 +1,7 @@
 {
-  "name": "Snake Game — Play Classic Snake Game Online",
+  "name": "Snake Game",
   "short_name": "Snake Game",
-  "description": "Play the classic snake game online for free. Guide the hungry snake, eat food, and grow longer.",
+  "description": "Play Snake Game online for free. Steer the snake, collect fruit, grow longer, and chase your high score — no download or login.",
   "icons": [
     {
       "src": "web-app-manifest-192x192.png",

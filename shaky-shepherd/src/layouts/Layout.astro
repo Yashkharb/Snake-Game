@@ -8,35 +8,42 @@ interface Props {
 }
 
 const {
-  title = 'Snake Game — Play Classic Snake Game Online Free',
+  title = 'Snake Game — Play the Classic Arcade Game Online',
   description =
-    'Play the classic snake game online for free. Guide the hungry snake, eat food, and grow longer in this fast-paced arcade snake game. No download, no login.',
+    'Play Snake Game online for free. Steer the snake, collect fruit, grow longer, and chase your high score. No download or login needed — works on desktop and mobile.',
   image = `${new URL(import.meta.env.BASE_URL + 'og-image.png', Astro.site).href}`,
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
+const siteURL = new URL(import.meta.env.BASE_URL, Astro.site).href;
+
 const structuredData = {
   '@context': 'https://schema.org',
-  '@type': 'VideoGame',
-  name: 'Snake Game',
-  alternateName: 'Classic Snake Game Online',
-  url: canonicalURL.href,
-  description,
-  genre: ['Arcade', 'Classic'],
-  operatingSystem: 'Any',
-  applicationCategory: 'GameApplication',
-  inLanguage: 'en',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-    availability: 'https://schema.org/InStock',
-  },
-  author: {
-    '@type': 'Organization',
-    name: 'Serpent Systems',
-  },
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      name: 'Snake Game',
+      url: siteURL,
+    },
+    {
+      '@type': 'VideoGame',
+      name: 'Snake Game',
+      url: canonicalURL.href,
+      description,
+      genre: ['Arcade', 'Classic'],
+      gamePlatform: 'Web Browser',
+      operatingSystem: 'Any web browser',
+      applicationCategory: 'GameApplication',
+      inLanguage: 'en',
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'USD',
+        availability: 'https://schema.org/InStock',
+      },
+    },
+  ],
 };
 ---
 
@@ -51,14 +58,10 @@ const structuredData = {
     <meta name="referrer" content="no-referrer" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' 'sha256-EclVj+ZTA/cSRwdE8mkszs5mYK8OAiTAL228Eg1BVs8=' 'sha256-NlXz1eBTz5BNWHC80Rtv+5vb9ZxdJ6m3y9wT0TCutQk=' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src https://www.googletagmanager.com https://www.google-analytics.com https://stats.g.doubleclick.net; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      content="default-src 'none'; script-src 'self' 'sha256-EclVj+ZTA/cSRwdE8mkszs5mYK8OAiTAL228Eg1BVs8=' 'sha256-NlXz1eBTz5BNWHC80Rtv+5vb9ZxdJ6m3y9wT0TCutQk=' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; manifest-src 'self'; connect-src https://www.googletagmanager.com https://www.google-analytics.com https://stats.g.doubleclick.net; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta
-      name="keywords"
-      content="snake game, google snake game, snake game google, the snake game, snake game online, classic snake game, snake game 3, snake game 2, hungry snake game"
-    />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href={canonicalURL.href} />
 
@@ -70,7 +73,7 @@ const structuredData = {
     <meta property="og:image" content={image} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Play the classic snake game online — collect food, grow your hungry snake, and chase the high score." />
+    <meta property="og:image:alt" content="Snake Game — steer the snake, collect fruit, and chase your high score on a dark arcade grid." />
     <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
@@ -84,7 +87,9 @@ const structuredData = {
     <link rel="icon" type="image/svg+xml" href={import.meta.env.BASE_URL + 'favicon.svg'} />
     <link rel="shortcut icon" href={import.meta.env.BASE_URL + 'favicon.ico'} />
     <link rel="apple-touch-icon" sizes="180x180" href={import.meta.env.BASE_URL + 'apple-touch-icon.png'} />
-    <meta name="apple-mobile-web-app-title" content="SnakeGame" />
+    <meta name="application-name" content="Snake Game" />
+    <meta name="apple-mobile-web-app-title" content="Snake Game" />
+    <meta name="theme-color" content="#0a0a0a" />
     <link rel="manifest" href={import.meta.env.BASE_URL + 'site.webmanifest'} />
     <link rel="preload" href={import.meta.env.BASE_URL + 'fonts/outfit-latin.woff2'} as="font" type="font/woff2" crossorigin />
     <link rel="preload" href={import.meta.env.BASE_URL + 'fonts/dm-mono-400-latin.woff2'} as="font" type="font/woff2" crossorigin />

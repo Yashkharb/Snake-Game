@@ -4,7 +4,7 @@
   <div class="card stat-card">
     <span class="eyebrow stat-label" translate="no">SCORE</span>
     <strong id="score" class="stat-value">000</strong>
-    <span class="stat-detail" id="score-detail" translate="no">FIND THE FIRST ORB</span>
+    <span class="stat-detail" id="score-detail" translate="no">EAT FRUIT TO SCORE</span>
   </div>
 
   <div class="card stat-card">
@@ -14,7 +14,7 @@
   </div>
 
   <div class="card stat-card">
-    <span class="eyebrow stat-label" translate="no">VELOCITY</span>
+    <span class="eyebrow stat-label" id="speed-label" translate="no">SPEED</span>
     <div class="level-row">
       <strong id="level" class="stat-value level-value">01</strong>
       <span id="speed-name" class="speed-name" translate="no">FLOW</span>
@@ -92,5 +92,44 @@
     background: linear-gradient(90deg, var(--color-sunset), var(--color-dusk));
     box-shadow: 0 0 8px rgba(255, 122, 23, 0.6);
     transition: width 0.3s ease;
+  }
+
+  /* ≤700px portrait: compact three-across scoreboard above the board. */
+  @media (max-width: 700px) {
+    .stat-rail {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.1fr;
+      gap: 6px;
+    }
+    .stat-card {
+      min-height: 82px;
+      padding: 10px 12px;
+    }
+    .stat-value {
+      font-size: 21px;
+    }
+  }
+
+  /* Short landscape: slim left rail beside the board. */
+  @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {
+    .stat-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stat-card {
+      min-height: 0;
+      padding: 8px;
+    }
+    .stat-value {
+      margin: 2px 0;
+      font-size: 18px;
+    }
+    .stat-detail {
+      display: none;
+    }
+    .level-row {
+      margin: 2px 0 6px;
+    }
   }
 </style>

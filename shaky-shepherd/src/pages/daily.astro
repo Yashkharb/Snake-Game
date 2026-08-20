@@ -1,0 +1,376 @@
+---
+---
+<main class="daily-page">
+  <header class="daily-header">
+    <h1>Daily Challenge</h1>
+    <p class="daily-subtitle">One puzzle a day. Same board for everyone on the same local date.</p>
+  </header>
+
+  <section class="daily-today" id="daily-today">
+    <h2>Today's Challenge</h2>
+    <div class="daily-today-card" id="daily-today-card">
+      <div class="daily-today-date" id="daily-today-date"></div>
+      <div class="daily-today-modifier" id="daily-today-modifier"></div>
+      <div class="daily-today-progress" id="daily-today-progress">
+        <span class="daily-progress-label">PROGRESS</span>
+        <div class="daily-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span class="daily-progress-fill" id="daily-today-progress-fill"></span>
+        </div>
+        <span class="daily-progress-text" id="daily-today-progress-text">0 / 60</span>
+      </div>
+      <div class="daily-today-stats">
+        <div class="daily-stat">
+          <span class="daily-stat-label">BEST</span>
+          <span class="daily-stat-value" id="daily-today-best">000</span>
+        </div>
+        <div class="daily-stat">
+          <span class="daily-stat-label">YOUR BEST</span>
+          <span class="daily-stat-value" id="daily-today-your-best">—</span>
+        </div>
+        <div class="daily-stat">
+          <span class="daily-stat-label">STREAK</span>
+          <span class="daily-stat-value" id="daily-today-streak">0 DAYS</span>
+        </div>
+      </div>
+      <p class="daily-today-desc" id="daily-today-desc"></p>
+    </div>
+  </section>
+
+  <section class="daily-history" id="daily-history">
+    <h2>History</h2>
+    <div class="daily-history-list" id="daily-history-list"></div>
+  </section>
+</main>
+
+<script>
+  import { mountDailyPage } from '../game/daily-page';
+  mountDailyPage();
+</script>
+
+<style>
+  .daily-page {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 40px 20px;
+  }
+
+  .daily-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .daily-header h1 {
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+    color: var(--color-ink);
+  }
+
+  .daily-subtitle {
+    color: var(--color-body);
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .daily-today,
+  .daily-history {
+    margin-bottom: 48px;
+  }
+
+  .daily-today h2,
+  .daily-history h2 {
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-hairline);
+  }
+
+  .daily-today-card {
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: rgba(255, 255, 255, 0.02);
+    padding: 24px;
+  }
+
+  .daily-today-date {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-ink);
+    margin-bottom: 16px;
+  }
+
+  .daily-today-modifier {
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--color-sunset-soft);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.6;
+  }
+
+  .daily-today-modifier.modifier-normal {
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--color-mute);
+  }
+
+  .daily-today-modifier.modifier-fast-snake {
+    border-color: rgba(248, 113, 113, 0.5);
+    color: #fca5a5;
+  }
+
+  .daily-today-modifier.modifier-wraparound {
+    border-color: rgba(127, 216, 164, 0.5);
+    color: #7fd8a4;
+  }
+
+  .daily-today-modifier.modifier-double-score {
+    border-color: rgba(250, 204, 21, 0.5);
+    color: #fde047;
+  }
+
+  .daily-today-modifier.modifier-fruit-storm {
+    border-color: rgba(196, 181, 253, 0.5);
+    color: #c4b5fd;
+  }
+
+  .daily-today-progress {
+    margin-bottom: 20px;
+  }
+
+  .daily-progress-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .daily-progress-bar {
+    height: 8px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .daily-progress-fill {
+    display: block;
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, var(--color-sunset), #c4b5fd);
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+
+  .daily-progress-text {
+    display: block;
+    text-align: right;
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+
+  .daily-today-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .daily-stat {
+    text-align: center;
+    padding: 14px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .daily-stat-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .daily-stat-value {
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 20px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .daily-today-desc {
+    color: var(--color-body);
+    font-size: 13px;
+    line-height: 1.6;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .daily-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .daily-history-item {
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 80px 80px;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .daily-history-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .daily-history-item.completed {
+    border-color: rgba(127, 216, 164, 0.4);
+  }
+
+  .daily-history-date {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  .daily-history-modifier {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    text-align: center;
+  }
+
+  .daily-history-modifier.normal {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-mute);
+  }
+
+  .daily-history-modifier.fast-snake {
+    background: rgba(248, 113, 113, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(248, 113, 113, 0.4);
+  }
+
+  .daily-history-modifier.wraparound {
+    background: rgba(127, 216, 164, 0.2);
+    color: #7fd8a4;
+    border: 1px solid rgba(127, 216, 164, 0.4);
+  }
+
+  .daily-history-modifier.double-score {
+    background: rgba(250, 204, 21, 0.2);
+    color: #fde047;
+    border: 1px solid rgba(250, 204, 21, 0.4);
+  }
+
+  .daily-history-modifier.fruit-storm {
+    background: rgba(196, 181, 253, 0.2);
+    color: #c4b5fd;
+    border: 1px solid rgba(196, 181, 253, 0.4);
+  }
+
+  .daily-history-score {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-ink);
+  }
+
+  .daily-history-score.best {
+    color: var(--color-sunset);
+  }
+
+  .daily-history-completed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(127, 216, 164, 0.2);
+    color: #7fd8a4;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+
+  .daily-history-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--color-mute);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 480px) {
+    .daily-history-item {
+      grid-template-columns: 1fr 70px 70px;
+      grid-template-rows: auto auto;
+      grid-template-areas:
+        "date modifier modifier"
+        "score best completed";
+    }
+
+    .daily-history-date {
+      grid-area: date;
+    }
+
+    .daily-history-modifier {
+      grid-area: modifier;
+      justify-self: start;
+    }
+
+    .daily-history-score {
+      grid-area: score;
+      justify-self: start;
+    }
+
+    .daily-history-score.best {
+      grid-area: best;
+      justify-self: center;
+    }
+
+    .daily-history-completed {
+      grid-area: completed;
+      justify-self: end;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .daily-progress-fill {
+      transition: none;
+    }
+  }
+</style>

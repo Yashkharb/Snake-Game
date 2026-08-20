@@ -20,6 +20,11 @@
  *
  * Definition of a "day": the player's local calendar date (00:00–23:59 in the
  * player's timezone), so the challenge flips automatically at local midnight.
+ *
+ * Daily Modifiers (Session 8): Each day can have a modifier that changes the
+ * rules slightly. Modifiers are derived deterministically from the date key,
+ * so the same date always produces the same modifier. Modifiers are designed
+ * to be attainable and not break the core guarantees.
  */
 import { CELLS, createInitialSnake } from './core.ts';
 import type { Cell, Rng, Vec } from './core.ts';
@@ -27,17 +32,101 @@ import type { Cell, Rng, Vec } from './core.ts';
 /** How many fruits make up one daily challenge. */
 export const DAILY_FOOD_COUNT = 60;
 
-/** Fixed challenge parameters — same rules for every date. */
+/** Daily modifier types — each changes the rules in a specific way. */
+export type DailyModifierId =
+  | 'normal'
+  | 'fast-snake'
+  | 'wraparound'
+  | 'double-score'
+  | 'fruit-storm';
+
+export interface DailyModifier {
+  id: DailyModifierId;
+  label: string;
+  description: string;
+  /** Rules changes applied when this modifier is active. */
+  rules: {
+    wrap?: boolean;
+    timeLimitMs?: number | null;
+    pointsPerFruit?: number;
+    speedFactor?: number; // multiplies base move delay (1.0 = normal, 0.7 = faster)
+  };
+}
+
+/** All available daily modifiers. */
+export const DAILY_MODIFIERS: readonly DailyModifier[] = [
+  {
+    id: 'normal',
+    label: 'NORMAL',
+    description: 'Standard daily challenge.',
+    rules: { wrap: false, timeLimitMs: null, pointsPerFruit: 10, speedFactor: 1.0 },
+  },
+  {
+    id: 'fast-snake',
+    label: 'FAST SNAKE',
+    description: 'Snake moves 30% faster. Reactions must be sharp.',
+    rules: { wrap: false, timeLimitMs: null, pointsPerFruit: 10, speedFactor: 0.7 },
+  },
+  {
+    id: 'wraparound',
+    label: 'WRAPAROUND',
+    description: 'Walls wrap around — leave one edge, appear on the other.',
+    rules: { wrap: true, timeLimitMs: null, pointsPerFruit: 10, speedFactor: 1.0 },
+  },
+  {
+    id: 'double-score',
+    label: 'DOUBLE SCORE',
+    description: 'Every fruit is worth 20 points. High scores await.',
+    rules: { wrap: false, timeLimitMs: null, pointsPerFruit: 20, speedFactor: 1.0 },
+  },
+  {
+    id: 'fruit-storm',
+    label: 'FRUIT STORM',
+    description: '90 fruits instead of 60. A longer, richer run.',
+    rules: { wrap: false, timeLimitMs: null, pointsPerFruit: 10, speedFactor: 1.0 },
+  },
+];
+
+/** Get a modifier by its ID. */
+export function getDailyModifier(id: DailyModifierId): DailyModifier {
+  return DAILY_MODIFIERS.find((m) => m.id === id) ?? DAILY_MODIFIERS[0];
+}
+
+/** Fixed challenge parameters — same base rules for every date. */
 export interface DailyChallengeParams {
   wrap: boolean;
   timeLimitMs: number | null;
   pointsPerFruit: number;
+  speedFactor: number;
+  foodCount: number;
 }
 
+/** Base daily challenge parameters (before modifier). */
 export const DAILY_CHALLENGE_PARAMS: DailyChallengeParams = {
   wrap: false,
   timeLimitMs: null,
   pointsPerFruit: 10,
+  speedFactor: 1.0,
+  foodCount: DAILY_FOOD_COUNT,
+};
+
+/** Compute the effective parameters for a given date (base + modifier). */
+export function getDailyParamsForDate(dateKey: string): DailyChallengeParams {
+  const modifier = getDailyModifierForDate(dateKey);
+  return {
+    wrap: modifier.rules.wrap ?? DAILY_CHALLENGE_PARAMS.wrap,
+    timeLimitMs: modifier.rules.timeLimitMs ?? DAILY_CHALLENGE_PARAMS.timeLimitMs,
+    pointsPerFruit: modifier.rules.pointsPerFruit ?? DAILY_CHALLENGE_PARAMS.pointsPerFruit,
+    speedFactor: modifier.rules.speedFactor ?? DAILY_CHALLENGE_PARAMS.speedFactor,
+    foodCount: modifier.id === 'fruit-storm' ? 90 : DAILY_CHALLENGE_PARAMS.foodCount,
+  };
+}
+
+/** Determine the modifier for a given date key — deterministic, no randomness. */
+export function getDailyModifierForDate(dateKey: string): DailyModifier {
+  const seed = hashString(dateKey);
+  const modifierIndex = seed % DAILY_MODIFIERS.length;
+  return DAILY_MODIFIERS[modifierIndex];
 };
 
 export interface DailyChallenge {
@@ -47,6 +136,10 @@ export interface DailyChallenge {
   seed: number;
   startingSnake: Cell[];
   startDirection: Vec;
+  /** The modifier active for this daily challenge. */
+  modifier: DailyModifier;
+  /** Effective parameters for this challenge (base + modifier). */
+  params: DailyChallengeParams;
 }
 
 /** The local calendar date key for a given instant (defaults to now). */
@@ -95,11 +188,15 @@ export function mulberry32(seed: number): Rng {
 export function generateDailyChallenge(dateKey: string): DailyChallenge {
   const seed = hashString(dateKey);
   const startingSnake = createInitialSnake().map((cell) => ({ ...cell }));
+  const modifier = getDailyModifierForDate(dateKey);
+  const params = getDailyParamsForDate(dateKey);
   return {
     dateKey,
     seed,
     startingSnake,
     startDirection: { x: 1, y: 0 },
+    modifier,
+    params,
   };
 }
 

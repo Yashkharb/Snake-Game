@@ -4,6 +4,7 @@ interface SerpentGame {
   snake: { x: number; y: number }[];
   direction: { x: number; y: number };
   food: { x: number; y: number } | null;
+  foodType: string;
   score: number;
   status: string;
   runId: number;
@@ -14,6 +15,10 @@ interface SerpentHook {
   getGame: () => SerpentGame;
   getMode: () => string;
   selectMode: (id: string) => void;
+  forceFoodType: (type: string) => void;
+  getEvents: () => { activeEventId: string | null; eventUntil: number; lastEventAt: number; triggered: number };
+  getEventRules: () => { enabled: boolean; pool: string[]; checkIntervalMs: number; baseChance: number; minFirstEventMs: number; minCooldownMs: number; maxEventsPerRun: number };
+  forceEvent: (id: string) => void;
 }
 
 async function getGame(page: Page): Promise<SerpentGame> {
@@ -195,6 +200,22 @@ test('eating a fruit scores, grows, and records a new best', async ({ page }) =>
   expect(Number(best)).toBe(g.score);
 });
 
+test('a golden special fruit scores +30 with distinct feedback', async ({ page }) => {
+  await page.keyboard.press('Space');
+  await expect.poll(() => getGame(page).then((g) => g.status)).toBe('running');
+  // Force the fruit already on the board to be golden.
+  await page.evaluate(() => {
+    const h = (window as unknown as { __serpent?: { forceFoodType: (t: string) => void } }).__serpent;
+    if (!h) throw new Error('__serpent hook missing — dev server required');
+    h.forceFoodType('golden');
+  });
+  expect((await getGame(page)).foodType).toBe('golden');
+  expect(await eatFruit(page)).toBe(true);
+  // Golden = +30 (no combo on the first fruit), with a color-coded popup.
+  await expect.poll(() => getGame(page).then((g) => g.score)).toBe(30);
+  await expect(page.locator('.score-popup--golden')).toHaveCount(1);
+});
+
 test('best score persists across a reload', async ({ page }) => {
   await page.evaluate(() => localStorage.setItem('serpent-high-score', '50'));
   await page.reload();
@@ -357,4 +378,47 @@ test('fullscreen puts the board on the full screen and back again', async ({ pag
   await expect.poll(immersive).toBe(false);
   await waitForFullscreen(page, false);
   await expect(page.locator('.fs-controls')).toBeHidden();
+});
+
+test('blood moon event doubles fruit points and shows event banner', async ({ page }) => {
+  await page.keyboard.press('Space');
+  await expect.poll(() => getGame(page).then((g) => g.status)).toBe('running');
+  // Force the fruit to be normal so we get exactly +20 (base 10 * 2).
+  await page.evaluate(() => {
+    const h = (window as unknown as { __serpent?: { forceFoodType: (t: string) => void } }).__serpent;
+    if (!h) throw new Error('__serpent hook missing');
+    h.forceFoodType('normal');
+  });
+  // Force blood moon event.
+  await page.evaluate(() => {
+    const h = (window as unknown as { __serpent?: { forceEvent: (t: string) => void } }).__serpent;
+    if (!h) throw new Error('__serpent hook missing');
+    h.forceEvent('blood-moon');
+  });
+  // Event banner should be visible with BLOOD MOON label.
+  await expect(page.locator('#event-banner')).toBeVisible();
+  await expect(page.locator('#event-banner')).toHaveText(/BLOOD MOON/);
+  // Eat a fruit — should score 20 (10 base * 2 blood moon, no combo on first fruit).
+  expect(await eatFruit(page)).toBe(true);
+  await expect.poll(() => getGame(page).then((g) => g.score)).toBe(20);
+});
+
+test('safe zone event lets the snake pass through walls', async ({ page }) => {
+  await page.keyboard.press('Space');
+  await expect.poll(() => getGame(page).then((g) => g.status)).toBe('running');
+  // Force safe zone event immediately.
+  await page.evaluate(() => {
+    const h = (window as unknown as { __serpent?: { forceEvent: (t: string) => void } }).__serpent;
+    if (!h) throw new Error('__serpent hook missing');
+    h.forceEvent('safe-zone');
+  });
+  // Event banner should be visible with SAFE ZONE label.
+  await expect(page.locator('#event-banner')).toBeVisible();
+  await expect(page.locator('#event-banner')).toHaveText(/SAFE ZONE/);
+  // The snake starts at x=10 moving right. Let it run until it wraps.
+  // With safe zone active, crossing the right wall should wrap to x=0.
+  await expect.poll(async () => {
+    const g = await getGame(page);
+    return g.status === 'running' && g.snake[0].x < 10;
+  }, { timeout: 15_000 }).toBe(true);
 });

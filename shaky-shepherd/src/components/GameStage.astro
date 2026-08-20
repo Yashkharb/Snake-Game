@@ -9,7 +9,11 @@
   <canvas id="game-board" aria-label="Snake game board"></canvas>
   <span class="mode-badge" id="mode-badge" translate="no">CLASSIC</span>
   <div class="scanline" aria-hidden="true"></div>
+  <div class="score-popups" id="score-popups" aria-hidden="true"></div>
   <div class="visually-hidden" id="status-announcer" role="status" aria-live="polite"></div>
+  <div class="mission-toast" id="mission-toast" aria-hidden="true" hidden></div>
+  <div class="mission-toast achievement-toast" id="achievement-toast" aria-hidden="true" hidden></div>
+  <div class="event-banner" id="event-banner" aria-hidden="true" hidden></div>
 
   <div class="game-overlay" id="start-overlay">
     <div class="overlay-glow" aria-hidden="true"></div>
@@ -23,6 +27,49 @@
       Standard Snake rules: eat fruit, grow, and don't hit the wall or your own tail.
     </p>
     <p class="overlay-mode-info" id="start-mode-info" translate="no"></p>
+    <p class="overlay-rank" id="player-rank" translate="no"></p>
+    <div class="missions-panel" id="missions-panel" translate="no" role="list" aria-label="Active missions">
+      <span class="eyebrow missions-heading">MISSIONS</span>
+      <div id="missions-list" class="missions-list"></div>
+    </div>
+    <div class="weekly-goals-panel" id="weekly-goals-panel" translate="no" role="list" aria-label="Weekly goals" hidden>
+      <span class="eyebrow missions-heading">WEEKLY GOALS</span>
+      <div id="weekly-goals-list" class="missions-list"></div>
+    </div>
+    <div class="daily-challenge-info" id="daily-challenge-info" hidden>
+      <div class="daily-modifier" id="daily-modifier" aria-live="polite"></div>
+      <div class="daily-progress">
+        <span class="daily-progress-label">PROGRESS</span>
+        <div class="daily-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span class="daily-progress-fill" id="daily-progress-fill"></span>
+        </div>
+        <span class="daily-progress-text" id="daily-progress-text">0 / 60</span>
+      </div>
+      <div class="daily-stats">
+        <div class="daily-stat">
+          <span class="daily-stat-label">BEST</span>
+          <span class="daily-stat-value" id="daily-best-value">000</span>
+        </div>
+        <div class="daily-stat">
+          <span class="daily-stat-label">YOUR BEST</span>
+          <span class="daily-stat-value" id="daily-your-best">000</span>
+        </div>
+        <div class="daily-stat">
+          <span class="daily-stat-label">STREAK</span>
+          <span class="daily-stat-value" id="daily-streak-value">0 DAYS</span>
+        </div>
+      </div>
+      <div class="streak-rewards" id="streak-rewards" hidden>
+        <span class="eyebrow streak-rewards-heading">STREAK REWARDS</span>
+        <div id="streak-rewards-list" class="streak-rewards-list"></div>
+      </div>
+      <div class="ghost-toggle" id="ghost-toggle" hidden>
+        <label class="ghost-toggle-label">
+          <input type="checkbox" id="ghost-toggle-input" aria-label="Show personal best ghost" />
+          <span class="ghost-toggle-text">SHOW GHOST</span>
+        </label>
+      </div>
+    </div>
     <p class="overlay-best" id="daily-best" hidden></p>
     <p class="overlay-streak" id="daily-streak" hidden></p>
     <button class="btn-pill btn-pill--primary" id="start-button">
@@ -43,7 +90,7 @@
     </button>
   </div>
 
-  <div class="game-overlay hidden" id="gameover-overlay" role="dialog" aria-labelledby="gameover-title" aria-describedby="gameover-kicker">
+<div class="game-overlay hidden" id="gameover-overlay" role="dialog" aria-labelledby="gameover-title" aria-describedby="gameover-kicker">
     <p class="eyebrow overlay-kicker" id="gameover-kicker">RUN OVER</p>
     <h2 class="display-tight" id="gameover-title">You hit the wall.</h2>
 
@@ -51,6 +98,13 @@
       <span class="eyebrow result-score-label" translate="no">SCORE</span>
       <strong id="final-score" class="result-score-value">000</strong>
       <span class="result-new-best" id="new-best-badge" translate="no">NEW BEST</span>
+    </div>
+
+    <div class="challenge-section" id="challenge-section" hidden>
+      <p class="eyebrow challenge-kicker" id="challenge-kicker">CHALLENGE</p>
+      <h2 class="display-tight challenge-title" id="challenge-title"></h2>
+      <p class="challenge-target" id="challenge-target" translate="no"></p>
+      <p class="challenge-result" id="challenge-result"></p>
     </div>
 
     <dl class="result-grid" aria-label="Run results">
@@ -82,7 +136,24 @@
         <dt translate="no">BEST LENGTH</dt>
         <dd id="final-record">4</dd>
       </div>
+      <div class="result-item result-item--wide">
+        <dt translate="no">XP EARNED</dt>
+        <dd id="final-xp-earned">0</dd>
+      </div>
+      <div class="result-item result-item--wide">
+        <dt translate="no">MISSIONS COMPLETED</dt>
+        <dd id="final-missions-completed">0</dd>
+      </div>
+      <div class="result-item result-item--wide">
+        <dt translate="no">ACHIEVEMENTS UNLOCKED</dt>
+        <dd id="final-achievements-unlocked">0</dd>
+      </div>
     </dl>
+
+    <div class="next-goal" id="next-goal" hidden>
+      <p class="eyebrow next-goal-label" translate="no">NEXT GOAL</p>
+      <p class="next-goal-text" id="next-goal-text"></p>
+    </div>
 
     <div class="result-actions">
       <button class="btn-pill btn-pill--primary" id="restart-button">
@@ -93,6 +164,9 @@
       </button>
       <button class="btn-pill btn-pill--secondary" id="share-button" type="button">
         <span id="share-button-label">Share score</span>
+      </button>
+      <button class="btn-pill btn-pill--secondary" id="challenge-share-button" type="button" hidden>
+        <span>Create challenge</span>
       </button>
     </div>
   </div>
@@ -414,6 +488,320 @@
     text-wrap: pretty;
   }
 
+  /* Persistent player progression line (rank + XP). */
+  .overlay-rank {
+    margin: -10px 0 20px;
+    color: var(--color-sunset-soft);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.5;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* Compact mission list (difficulty tag, title, live progress bar). Only the
+     start screen shows it; the board itself stays clean. */
+  .missions-panel {
+    width: min(300px, 100%);
+    margin: -6px 0 18px;
+    text-align: left;
+  }
+
+  .missions-panel[hidden] {
+    display: none;
+  }
+
+  .missions-heading {
+    display: block;
+    margin-bottom: 6px;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0.18em;
+  }
+
+  .missions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .mission-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 5px 10px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .mission-tag {
+    padding: 2px 7px;
+    border: 1px solid currentColor;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+  }
+
+  .diff-easy {
+    color: #7fd8a4;
+  }
+
+  .diff-medium {
+    color: var(--color-sunset-soft);
+  }
+
+  .diff-hard {
+    color: var(--color-sunset);
+  }
+
+  .diff-master {
+    color: #c4b5fd;
+  }
+
+  .mission-title {
+    overflow: hidden;
+    color: var(--color-body);
+    font-size: 12px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .mission-count {
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mission-bar {
+    grid-column: 1 / -1;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .mission-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, var(--color-sunset), #c4b5fd);
+    transition: width 0.3s ease;
+  }
+
+  .mission-row.is-complete .mission-bar-fill {
+    background: linear-gradient(90deg, #7fd8a4, #c4b5fd);
+  }
+
+  .mission-row.is-complete .mission-count {
+    color: #7fd8a4;
+  }
+
+  /* Transient, non-blocking mission-complete confirmation over the board. */
+  .mission-toast {
+    position: absolute;
+    top: 64px;
+    left: 50%;
+    z-index: 6;
+    padding: 8px 16px;
+    border: 1px solid rgba(124, 58, 237, 0.55);
+    border-radius: 9999px;
+    background: rgba(10, 10, 10, 0.85);
+    color: #e9d5ff;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    white-space: nowrap;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translate(-50%, -6px);
+    pointer-events: none;
+    backdrop-filter: blur(3px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+
+  .mission-toast.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  /* Achievement unlocks: same restrained toast, offset below the mission one
+     and tinted with the dusk accent so the two never look like the same event. */
+  .achievement-toast {
+    top: 116px;
+    border-color: rgba(196, 165, 253, 0.55);
+    color: #e9d5ff;
+  }
+
+  .mission-toast[hidden] {
+    display: none;
+  }
+
+  /* Event banner (Session 6): persistent while an event is active, shows
+     event label and countdown. Positioned below mode badge, above toasts. */
+  .event-banner {
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    z-index: 6;
+    padding: 4px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 9999px;
+    background: rgba(10, 10, 10, 0.78);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    white-space: nowrap;
+    text-transform: uppercase;
+    transform: translateX(-50%);
+    backdrop-filter: blur(3px);
+    pointer-events: none;
+    user-select: none;
+  }
+  .event-banner[hidden] {
+    display: none;
+  }
+  .event-banner.is-visible {
+    animation: event-pop 0.3s ease;
+  }
+  .event-banner.event-gold-rush {
+    border-color: rgba(250, 204, 21, 0.6);
+    color: #fde047;
+  }
+  .event-banner.event-blood-moon {
+    border-color: rgba(248, 113, 113, 0.6);
+    color: #fca5a5;
+  }
+  .event-banner.event-safe-zone {
+    border-color: rgba(127, 216, 164, 0.6);
+    color: #7fd8a4;
+  }
+
+  @keyframes event-pop {
+    0% {
+      transform: translateX(-50%) scale(0.9);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(-50%) scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Event board ring (Session 6): subtle colored inset border on the stage
+     while an event is active — a peripheral cue without animation. */
+  .game-stage.event-active::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: var(--radius-card);
+    pointer-events: none;
+  }
+  .game-stage.event-gold-rush::after {
+    border-color: rgba(250, 204, 21, 0.45);
+  }
+  .game-stage.event-blood-moon::after {
+    border-color: rgba(248, 113, 113, 0.45);
+  }
+  .game-stage.event-safe-zone::after {
+    border-color: rgba(127, 216, 164, 0.45);
+  }
+
+  /* Floating score feedback over the board (Session 4): small transient
+     popups anchored to board cells, purely decorative and non-blocking. */
+  .score-popups {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .score-popup {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    transform: translate(-50%, -50%);
+    animation: popup-rise 1s ease-out forwards;
+  }
+
+  .score-popup-value {
+    color: var(--color-ink);
+    font-size: 16px;
+    text-shadow: 0 0 10px rgba(255, 122, 23, 0.5);
+  }
+
+  .score-popup-tag {
+    color: var(--color-sunset-soft);
+    font-size: 9px;
+  }
+
+  .score-popup--combo .score-popup-value {
+    color: #ffd9a8;
+  }
+
+  .score-popup--risk .score-popup-value {
+    color: #c4b5fd;
+  }
+
+  .score-popup--lost .score-popup-value {
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  /* Special food popups (Session 5): each type gets its board-palette accent
+     so pickup feedback matches the fruit the player just saw. */
+  .score-popup--golden .score-popup-value {
+    color: #fde047;
+  }
+
+  .score-popup--slow .score-popup-value {
+    color: #7dd3fc;
+  }
+
+  .score-popup--multiplier .score-popup-value {
+    color: #c4b5fd;
+  }
+
+  .score-popup--cursed .score-popup-value {
+    color: #fca5a5;
+  }
+
+  .score-popup--time .score-popup-value {
+    color: #5eead4;
+  }
+
+  .score-popup--effect .score-popup-value {
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  @keyframes popup-rise {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -30%);
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -170%);
+    }
+  }
+
   /* Daily Challenge identity lines (date + best) — visible only in daily mode.
      The [hidden] selector outranks the .is-daily display rule, so a stale
      hidden attribute always wins. */
@@ -476,6 +864,264 @@
     display: none;
   }
 
+  /* Enhanced Daily Challenge info panel (Session 8) */
+  .daily-challenge-info {
+    margin: 16px 0 20px;
+    padding: 16px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: rgba(255, 255, 255, 0.02);
+    text-align: left;
+  }
+
+  .daily-challenge-info[hidden] {
+    display: none;
+  }
+
+  .daily-modifier {
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--color-sunset-soft);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    line-height: 1.5;
+  }
+
+  .daily-modifier.modifier-normal {
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--color-mute);
+  }
+
+  .daily-modifier.modifier-fast-snake {
+    border-color: rgba(248, 113, 113, 0.5);
+    color: #fca5a5;
+  }
+
+  .daily-modifier.modifier-wraparound {
+    border-color: rgba(127, 216, 164, 0.5);
+    color: #7fd8a4;
+  }
+
+  .daily-modifier.modifier-double-score {
+    border-color: rgba(250, 204, 21, 0.5);
+    color: #fde047;
+  }
+
+  .daily-modifier.modifier-fruit-storm {
+    border-color: rgba(196, 181, 253, 0.5);
+    color: #c4b5fd;
+  }
+
+  .daily-progress {
+    margin-bottom: 16px;
+  }
+
+  .daily-progress-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .daily-progress-bar {
+    height: 6px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+
+  .daily-progress-fill {
+    display: block;
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, var(--color-sunset), #c4b5fd);
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+
+  .daily-progress-text {
+    display: block;
+    text-align: right;
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .daily-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .daily-stat {
+    text-align: center;
+    padding: 10px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .daily-stat-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .daily-stat-value {
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Weekly goals panel (Session 9) — same style as missions panel. */
+  .weekly-goals-panel {
+    width: min(300px, 100%);
+    margin: -6px 0 18px;
+    text-align: left;
+  }
+
+  .weekly-goals-panel[hidden] {
+    display: none;
+  }
+
+  .weekly-tag {
+    padding: 2px 7px;
+    border: 1px solid currentColor;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    color: #c4b5fd;
+  }
+
+  /* Streak rewards panel (Session 9) */
+  .streak-rewards {
+    margin-top: 16px;
+    padding: 12px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: rgba(255, 255, 255, 0.02);
+    text-align: left;
+  }
+
+  .streak-rewards[hidden] {
+    display: none;
+  }
+
+  .streak-rewards-heading {
+    display: block;
+    margin-bottom: 8px;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0.18em;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+  }
+
+  .streak-rewards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .streak-reward-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 4px 8px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.03);
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+
+  .streak-reward-row.claimed {
+    opacity: 0.6;
+    border-color: rgba(127, 216, 164, 0.5);
+  }
+
+  .streak-reward-day {
+    padding: 1px 6px;
+    border: 1px solid currentColor;
+    border-radius: 9999px;
+    font-size: 7px;
+    letter-spacing: 0.1em;
+    color: #fde047;
+  }
+
+  .streak-reward-name {
+    overflow: hidden;
+    color: var(--color-body);
+    font-size: 10px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .streak-reward-xp {
+    color: #fde047;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Ghost toggle (Session 10) */
+  .ghost-toggle {
+    margin-top: 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: rgba(255, 255, 255, 0.02);
+    text-align: left;
+  }
+
+  .ghost-toggle[hidden] {
+    display: none;
+  }
+
+  .ghost-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-sunset-soft);
+  }
+
+  .ghost-toggle-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-sunset);
+  }
+
+  .ghost-toggle-text {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
   /* Persistent mode indicator, on top of every overlay (incl. results). */
   .mode-badge {
     position: absolute;
@@ -515,6 +1161,21 @@
     }
   }
 
+  /* Reduced motion: no transition animation on mission feedback. */
+  @media (prefers-reduced-motion: reduce) {
+    .mission-toast,
+    .mission-bar-fill {
+      transition: none;
+    }
+    .score-popup {
+      animation: none;
+      opacity: 1;
+    }
+    .event-banner {
+      animation: none;
+    }
+  }
+
   /* Small portrait boards: keep the overlay inside the square. */
   @media (max-width: 480px) {
     .game-overlay {
@@ -522,7 +1183,7 @@
     }
     /* Move mode badge down in fullscreen to avoid overlapping fs-controls. */
     body.is-fullscreen .mode-badge {
-      top: 50px;
+      top: 65px;
     }
   }
     /* The Daily Challenge screen reads as a card: top-align it so the Play
@@ -551,6 +1212,22 @@
     .overlay-mode-info {
       margin: -8px 0 12px;
       font-size: 9px;
+    }
+    .overlay-rank {
+      margin: -8px 0 12px;
+      font-size: 9px;
+    }
+    .missions-panel {
+      width: min(280px, 100%);
+      margin: -4px 0 12px;
+    }
+    .mission-title {
+      font-size: 11px;
+    }
+    /* The daily card is top-aligned on small portrait screens; drop the
+       mission list there so the Play challenge CTA stays above the fold. */
+    .game-overlay.is-daily .missions-panel {
+      display: none;
     }
     .game-overlay.is-daily .overlay-date {
       margin: -4px 0 8px;
@@ -587,6 +1264,73 @@
     .result-item dd {
       font-size: 13px;
     }
+    .result-actions .btn-pill {
+      min-height: 36px;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+  }
+
+  /* Challenge section (Session 11) */
+  .challenge-section {
+    margin: 16px 0 20px;
+    padding: 16px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: rgba(255, 255, 255, 0.02);
+    text-align: center;
+  }
+
+  .challenge-section[hidden] {
+    display: none;
+  }
+
+  .challenge-kicker {
+    margin-bottom: 8px;
+    color: var(--color-sunset-soft);
+    letter-spacing: 0.18em;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+  }
+
+  .challenge-title {
+    margin: 0 0 8px;
+    color: var(--color-ink);
+    font-size: 20px;
+    font-weight: 400;
+  }
+
+  .challenge-target {
+    margin: 8px 0 12px;
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-sunset);
+  }
+
+  .challenge-result {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .challenge-result.beaten {
+    color: #7fd8a4;
+  }
+
+  .challenge-result.not-beaten {
+    color: var(--color-sunset);
+  }
+
+  /* Challenge share button */
+  #challenge-share-button[hidden] {
+    display: none;
+  }
+
+  /* Small portrait boards: keep the overlay inside the square. */
+  @media (max-width: 480px) {
     .result-actions {
       flex-direction: column-reverse;
       gap: 8px;
@@ -633,6 +1377,8 @@
     .overlay-text,
     .overlay-note,
     .overlay-mode-info,
+    .overlay-rank,
+    .missions-panel,
     .overlay-date,
     .overlay-best,
     .overlay-streak,

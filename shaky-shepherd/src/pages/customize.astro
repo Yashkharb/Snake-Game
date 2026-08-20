@@ -1,0 +1,213 @@
+---
+---
+<main class="customize-page">
+  <h1>Customize</h1>
+  <p class="subtitle">Unlock and equip cosmetics by playing the game. Cosmetics are purely visual and provide no gameplay advantage.</p>
+
+  <section class="cosmetic-category" data-category="snake">
+    <h2>Snake Skins</h2>
+    <div class="cosmetic-grid" id="snake-grid"></div>
+  </section>
+
+  <section class="cosmetic-category" data-category="food">
+    <h2>Food Skins</h2>
+    <div class="cosmetic-grid" id="food-grid"></div>
+  </section>
+
+  <section class="cosmetic-category" data-category="trail">
+    <h2>Trails</h2>
+    <div class="cosmetic-grid" id="trail-grid"></div>
+  </section>
+
+  <section class="cosmetic-category" data-category="board">
+    <h2>Board Themes</h2>
+    <div class="cosmetic-grid" id="board-grid"></div>
+  </section>
+</main>
+
+<script>
+  import { mountCustomize } from '../game/customize';
+  mountCustomize();
+</script>
+
+<style>
+  .customize-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+  }
+
+  h1 {
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+    color: var(--color-ink);
+  }
+
+  .subtitle {
+    color: var(--color-body);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 40px;
+    max-width: 600px;
+  }
+
+  .cosmetic-category {
+    margin-bottom: 48px;
+  }
+
+  .cosmetic-category h2 {
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-hairline);
+  }
+
+  .cosmetic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+
+  .cosmetic-card {
+    position: relative;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: rgba(255, 255, 255, 0.02);
+    padding: 20px 16px;
+    text-align: center;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+
+  .cosmetic-card:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .cosmetic-card.locked {
+    opacity: 0.5;
+  }
+
+  .cosmetic-card.equipped {
+    border-color: var(--color-sunset);
+    background: rgba(255, 122, 23, 0.08);
+  }
+
+  .cosmetic-preview {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 12px;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cosmetic-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-ink);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cosmetic-desc {
+    font-size: 11px;
+    color: var(--color-mute);
+    line-height: 1.4;
+    margin-bottom: 12px;
+    min-height: 2.8em;
+  }
+
+  .cosmetic-status {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    display: inline-block;
+  }
+
+  .cosmetic-status.locked {
+    color: var(--color-mute);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-hairline);
+  }
+
+  .cosmetic-status.unlocked {
+    color: #7fd8a4;
+    background: rgba(127, 216, 164, 0.15);
+    border: 1px solid rgba(127, 216, 164, 0.4);
+  }
+
+  .cosmetic-status.equipped {
+    color: var(--color-sunset-soft);
+    background: rgba(255, 122, 23, 0.15);
+    border: 1px solid rgba(255, 122, 23, 0.4);
+  }
+
+  .equip-button {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--color-body);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+
+  .equip-button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: var(--color-ink);
+  }
+
+  .equip-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .equip-button.equipped {
+    background: rgba(255, 122, 23, 0.2);
+    border-color: var(--color-sunset);
+    color: var(--color-sunset-soft);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cosmetic-preview * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .cosmetic-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .cosmetic-card {
+      padding: 16px 12px;
+    }
+
+    .cosmetic-preview {
+      width: 64px;
+      height: 64px;
+    }
+  }
+</style>

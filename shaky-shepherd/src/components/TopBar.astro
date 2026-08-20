@@ -7,6 +7,9 @@ const base = import.meta.env.BASE_URL;
     <span>Snake Game</span>
   </a>
   <div class="topbar-right">
+    <a class="how-link" href={base + 'daily/'}>Daily</a>
+    <a class="how-link" href={base + 'customize/'}>Customize</a>
+    <a class="how-link" href={base + 'achievements/'}>Achievements</a>
     <a class="how-link" href={base + '#how-to-play'}>How to play</a>
   </div>
 </header>
@@ -61,6 +64,7 @@ const base = import.meta.env.BASE_URL;
   .topbar-right {
     display: flex;
     align-items: center;
+    gap: 18px;
   }
 
   .how-link {

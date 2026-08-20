@@ -4,10 +4,14 @@ import {
   buildDailyShareMessage,
   DAILY_CHALLENGE_PARAMS,
   DAILY_FOOD_COUNT,
+  DAILY_MODIFIERS,
   dailyDateKey,
   dailyFoodFor,
   formatDailyDate,
   generateDailyChallenge,
+  getDailyModifierForDate,
+  getDailyModifier,
+  getDailyParamsForDate,
   hashString,
   mulberry32,
   previousDayKey,
@@ -108,6 +112,8 @@ test('challenge state survives reload and corrupt status is tolerated', () => {
     level: 4,
     durationMs: 61_000,
     length: 16,
+    modifier: undefined,
+    params: undefined,
   });
 
   const after = generateDailyChallenge('2026-08-19');
@@ -430,4 +436,199 @@ test('formatDailyDate is a stable, readable label', () => {
   assert.equal(formatDailyDate('2026-08-19'), formatDailyDate('2026-08-19'));
   assert.match(formatDailyDate('2026-08-19'), /2026/);
   assert.match(formatDailyDate('2026-08-19'), /19/);
+});
+
+// --- Daily Modifiers (Session 8) -------------------------------------------
+
+test('DAILY_MODIFIERS has the expected set of modifiers', () => {
+  const ids = DAILY_MODIFIERS.map((m) => m.id).sort();
+  assert.deepEqual(ids, ['double-score', 'fast-snake', 'fruit-storm', 'normal', 'wraparound']);
+  for (const m of DAILY_MODIFIERS) {
+    assert.ok(m.id);
+    assert.ok(m.label);
+    assert.ok(m.description);
+    assert.ok(m.rules);
+  }
+});
+
+test('getDailyModifier returns the correct modifier by id', () => {
+  const fast = getDailyModifier('fast-snake');
+  assert.equal(fast.id, 'fast-snake');
+  assert.equal(fast.rules.speedFactor, 0.7);
+  assert.equal(getDailyModifier('unknown'), DAILY_MODIFIERS[0]); // falls back to normal
+});
+
+test('getDailyModifierForDate is deterministic for the same date', () => {
+  const dateKey = '2026-08-19';
+  const m1 = getDailyModifierForDate(dateKey);
+  const m2 = getDailyModifierForDate(dateKey);
+  assert.equal(m1.id, m2.id);
+  assert.equal(m1.label, m2.label);
+});
+
+test('getDailyModifierForDate produces different modifiers for different dates', () => {
+  const modifiers = new Set<string>();
+  for (let day = 1; day <= 30; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    modifiers.add(getDailyModifierForDate(dateKey).id);
+  }
+  // With 5 modifiers and 30 days, we should see multiple different ones
+  assert.ok(modifiers.size > 1);
+});
+
+test('getDailyParamsForDate returns correct params for normal modifier', () => {
+  // Find a date that gives 'normal' modifier
+  let normalDate = '';
+  for (let day = 1; day <= 30; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'normal') {
+      normalDate = dateKey;
+      break;
+    }
+  }
+  assert.ok(normalDate, 'should find at least one normal date in range');
+  const params = getDailyParamsForDate(normalDate);
+  assert.equal(params.wrap, false);
+  assert.equal(params.timeLimitMs, null);
+  assert.equal(params.pointsPerFruit, 10);
+  assert.equal(params.speedFactor, 1.0);
+  assert.equal(params.foodCount, 60);
+});
+
+test('getDailyParamsForDate returns correct params for fast-snake modifier', () => {
+  let fastDate = '';
+  for (let day = 1; day <= 30; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'fast-snake') {
+      fastDate = dateKey;
+      break;
+    }
+  }
+  if (fastDate) {
+    const params = getDailyParamsForDate(fastDate);
+    assert.equal(params.speedFactor, 0.7);
+    assert.equal(params.pointsPerFruit, 10);
+    assert.equal(params.foodCount, 60);
+  }
+});
+
+test('getDailyParamsForDate returns correct params for wraparound modifier', () => {
+  let wrapDate = '';
+  for (let day = 1; day <= 30; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'wraparound') {
+      wrapDate = dateKey;
+      break;
+    }
+  }
+  if (wrapDate) {
+    const params = getDailyParamsForDate(wrapDate);
+    assert.equal(params.wrap, true);
+    assert.equal(params.speedFactor, 1.0);
+  }
+});
+
+test('getDailyParamsForDate returns correct params for double-score modifier', () => {
+  let doubleDate = '';
+  for (let day = 1; day <= 30; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'double-score') {
+      doubleDate = dateKey;
+      break;
+    }
+  }
+  if (doubleDate) {
+    const params = getDailyParamsForDate(doubleDate);
+    assert.equal(params.pointsPerFruit, 20);
+    assert.equal(params.speedFactor, 1.0);
+  }
+});
+
+test('getDailyParamsForDate returns correct params for fruit-storm modifier', () => {
+  let stormDate = '';
+  for (let day = 1; day <= 30; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'fruit-storm') {
+      stormDate = dateKey;
+      break;
+    }
+  }
+  if (stormDate) {
+    const params = getDailyParamsForDate(stormDate);
+    assert.equal(params.foodCount, 90);
+    assert.equal(params.pointsPerFruit, 10);
+  }
+});
+
+test('generateDailyChallenge includes modifier and params', () => {
+  const challenge = generateDailyChallenge('2026-08-19');
+  assert.ok(challenge.modifier);
+  assert.ok(challenge.params);
+  assert.equal(challenge.params.foodCount, challenge.modifier.id === 'fruit-storm' ? 90 : 60);
+  assert.equal(challenge.params.pointsPerFruit, challenge.modifier.rules.pointsPerFruit ?? 10);
+  assert.equal(challenge.params.speedFactor, challenge.modifier.rules.speedFactor ?? 1.0);
+  assert.equal(challenge.params.wrap, challenge.modifier.rules.wrap ?? false);
+});
+
+test('daily challenge with fruit-storm has 90 fruits', () => {
+  // Find a fruit-storm date
+  let stormDate = '';
+  for (let day = 1; day <= 60; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'fruit-storm') {
+      stormDate = dateKey;
+      break;
+    }
+  }
+  if (stormDate) {
+    const challenge = generateDailyChallenge(stormDate);
+    assert.equal(challenge.params.foodCount, 90);
+    const params = getDailyParamsForDate(stormDate);
+    assert.equal(params.foodCount, 90);
+  }
+});
+
+test('daily challenge with wraparound has wrap=true', () => {
+  let wrapDate = '';
+  for (let day = 1; day <= 60; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'wraparound') {
+      wrapDate = dateKey;
+      break;
+    }
+  }
+  if (wrapDate) {
+    const challenge = generateDailyChallenge(wrapDate);
+    assert.equal(challenge.params.wrap, true);
+  }
+});
+
+test('daily challenge with double-score has pointsPerFruit=20', () => {
+  let doubleDate = '';
+  for (let day = 1; day <= 60; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'double-score') {
+      doubleDate = dateKey;
+      break;
+    }
+  }
+  if (doubleDate) {
+    const challenge = generateDailyChallenge(doubleDate);
+    assert.equal(challenge.params.pointsPerFruit, 20);
+  }
+});
+
+test('daily challenge with fast-snake has speedFactor=0.7', () => {
+  let fastDate = '';
+  for (let day = 1; day <= 60; day++) {
+    const dateKey = `2026-08-${String(day).padStart(2, '0')}`;
+    if (getDailyModifierForDate(dateKey).id === 'fast-snake') {
+      fastDate = dateKey;
+      break;
+    }
+  }
+  if (fastDate) {
+    const challenge = generateDailyChallenge(fastDate);
+    assert.equal(challenge.params.speedFactor, 0.7);
+  }
 });

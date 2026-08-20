@@ -1,0 +1,295 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+---
+
+<PageLayout
+  title="Achievements — Snake Game"
+  description="Every achievement in Snake Game — beginner feats, skill moments, mode milestones, and hidden secrets. Unlock them to earn XP toward your rank."
+  eyebrow="ACHIEVEMENTS"
+  heading="Feats worth chasing."
+  kicker="Permanent goals across every mode and a few hidden ones. Secret achievements show as ??? until you earn them — each unlock grants XP toward your rank."
+>
+  <div id="achievements-app" class="achievements-app" aria-live="polite">
+    <p class="achievements-note">Loading achievements…</p>
+  </div>
+  <noscript>
+    <p class="achievements-note">Achievements are tracked on your device. Enable JavaScript to see your list.</p>
+  </noscript>
+</PageLayout>
+
+<script>
+  import { ACHIEVEMENTS } from '../game/achievements.ts';
+  import type { AchievementCategory, AchievementDefinition, AchievementTier } from '../game/achievements.ts';
+  import { loadProfile } from '../game/progression.ts';
+
+  const CATEGORY_ORDER: AchievementCategory[] = ['beginner', 'skill', 'mode', 'extreme', 'secret'];
+  const CATEGORY_LABELS: Record<AchievementCategory, string> = {
+    beginner: 'BEGINNER',
+    skill: 'SKILL',
+    mode: 'MODE',
+    extreme: 'EXTREME',
+    secret: 'SECRET',
+  };
+  const TIER_LABELS: Record<AchievementTier, string> = {
+    beginner: 'BEGINNER',
+    intermediate: 'INTERMEDIATE',
+    advanced: 'ADVANCED',
+    master: 'MASTER',
+  };
+
+  const profile = loadProfile();
+  const unlocked = new Set(profile.unlockedAchievements);
+
+  const root = document.getElementById('achievements-app');
+  if (!root) throw new Error('missing #achievements-app');
+  root.textContent = '';
+
+  const unlockedCount = ACHIEVEMENTS.filter((a) => unlocked.has(a.id)).length;
+  const earnedXp = ACHIEVEMENTS.filter((a) => unlocked.has(a.id)).reduce((sum, a) => sum + a.rewardXp, 0);
+
+  const summary = document.createElement('div');
+  summary.className = 'achievements-summary';
+  const count = document.createElement('p');
+  count.className = 'achievements-count';
+  count.textContent = `${unlockedCount} / ${ACHIEVEMENTS.length} UNLOCKED`;
+  const xpLine = document.createElement('p');
+  xpLine.className = 'achievements-xp';
+  xpLine.textContent = `+${earnedXp} XP FROM ACHIEVEMENTS`;
+  summary.append(count, xpLine);
+  root.append(summary);
+
+  for (const category of CATEGORY_ORDER) {
+    const section = document.createElement('section');
+    section.className = 'achievement-category';
+    section.setAttribute('aria-labelledby', `ach-cat-${category}`);
+
+    const members = ACHIEVEMENTS.filter((a) => a.category === category);
+    const sectionUnlocked = members.filter((a) => unlocked.has(a.id)).length;
+
+    const head = document.createElement('h2');
+    head.id = `ach-cat-${category}`;
+    head.className = 'achievement-category-head';
+    head.textContent = CATEGORY_LABELS[category];
+    const headCount = document.createElement('span');
+    headCount.textContent = `${sectionUnlocked} / ${members.length}`;
+    head.append(headCount);
+
+    const list = document.createElement('ul');
+    list.className = 'achievement-list';
+    for (const achievement of members) list.append(renderAchievement(achievement, unlocked.has(achievement.id)));
+
+    section.append(head, list);
+    root.append(section);
+  }
+
+  function renderAchievement(achievement: AchievementDefinition, isUnlocked: boolean): HTMLLIElement {
+    const row = document.createElement('li');
+    row.className = `achievement-row${isUnlocked ? ' is-unlocked' : ' is-locked'}`;
+
+    const tier = document.createElement('span');
+    tier.className = `achievement-tier tier-${achievement.tier}`;
+    tier.textContent = achievement.hidden && !isUnlocked ? '???' : TIER_LABELS[achievement.tier];
+
+    const copy = document.createElement('div');
+    copy.className = 'achievement-copy';
+    const title = document.createElement('p');
+    title.className = 'achievement-title';
+    title.textContent = achievement.hidden && !isUnlocked ? '???' : achievement.title;
+    const desc = document.createElement('p');
+    desc.className = 'achievement-desc';
+    desc.textContent =
+      achievement.hidden && !isUnlocked
+        ? 'Secret Achievement — keep playing to reveal it.'
+        : achievement.description;
+    copy.append(title, desc);
+
+    const meta = document.createElement('div');
+    meta.className = 'achievement-meta';
+    const reward = document.createElement('span');
+    reward.className = 'achievement-reward';
+    reward.textContent = achievement.hidden && !isUnlocked ? '+?? XP' : `+${achievement.rewardXp} XP`;
+    const status = document.createElement('span');
+    status.className = 'achievement-status';
+    status.textContent = isUnlocked ? 'UNLOCKED' : 'LOCKED';
+    meta.append(reward, status);
+
+    row.append(tier, copy, meta);
+    return row;
+  }
+</script>
+
+<style>
+  .achievements-app {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+    margin-top: 8px;
+  }
+
+  .achievements-note {
+    margin: 0;
+    color: var(--color-mute);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .achievements-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    align-items: baseline;
+    padding: 14px 16px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: var(--color-canvas-card);
+  }
+
+  .achievements-count,
+  .achievements-xp {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+  }
+
+  .achievements-count {
+    color: var(--color-ink);
+  }
+
+  .achievements-xp {
+    color: var(--color-sunset-soft);
+  }
+
+  .achievement-category-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-hairline);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .achievement-category-head span {
+    color: var(--color-mute);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  .achievement-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .achievement-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 6px 14px;
+    align-items: center;
+    padding: 10px 14px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-card);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .achievement-tier {
+    min-width: 92px;
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    text-align: center;
+  }
+
+  .tier-beginner {
+    color: #7fd8a4;
+  }
+
+  .tier-intermediate {
+    color: var(--color-sunset-soft);
+  }
+
+  .tier-advanced {
+    color: var(--color-sunset);
+  }
+
+  .tier-master {
+    color: var(--color-twilight);
+  }
+
+  .achievement-copy {
+    min-width: 0;
+  }
+
+  .achievement-title {
+    margin: 0 0 2px;
+    color: var(--color-ink);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .achievement-desc {
+    margin: 0;
+    color: var(--color-mute);
+    font-size: 13px;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .achievement-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+
+  .achievement-reward {
+    color: var(--color-sunset-soft);
+  }
+
+  .achievement-status {
+    color: var(--color-mute);
+  }
+
+  .achievement-row.is-unlocked .achievement-status {
+    color: #7fd8a4;
+  }
+
+  .achievement-row.is-locked .achievement-title {
+    color: var(--color-mute);
+  }
+
+  @media (max-width: 700px) {
+    .achievement-row {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .achievement-tier {
+      justify-self: start;
+      min-width: 0;
+    }
+    .achievement-meta {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+</style>

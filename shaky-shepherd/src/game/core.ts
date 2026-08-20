@@ -1,3 +1,5 @@
+import type { FoodType, PlacedFood } from './food.ts';
+
 export interface Cell {
   x: number;
   y: number;
@@ -17,6 +19,8 @@ export interface GameState {
   direction: Vec;
   turnQueue: Vec[];
   food: Cell | null;
+  /** The type of the fruit currently on the board (Session 5 special food). */
+  foodType: FoodType;
   score: number;
   status: GameStatus;
   runId: number;
@@ -46,6 +50,7 @@ export function createInitialState(): GameState {
     direction: { x: 1, y: 0 },
     turnQueue: [],
     food: null,
+    foodType: 'normal',
     score: 0,
     status: 'idle',
     runId: 0,
@@ -53,13 +58,18 @@ export function createInitialState(): GameState {
   };
 }
 
-export function startRun(state: GameState, rng: Rng = Math.random): GameState {
+export function startRun(state: GameState, rng: Rng = Math.random, placedFood?: PlacedFood): GameState {
   const snake = createInitialSnake();
+  const placed = placedFood ?? (() => {
+    const cell = spawnFood(snake, rng);
+    return cell ? { cell, type: 'normal' as FoodType } : null;
+  })();
   return {
     snake,
     direction: { x: 1, y: 0 },
     turnQueue: [],
-    food: spawnFood(snake, rng),
+    food: placed?.cell ?? null,
+    foodType: placed?.type ?? 'normal',
     score: 0,
     status: 'running',
     runId: state.runId + 1,
@@ -119,6 +129,12 @@ export interface StepOptions {
    * food sequence. Returning null ends the run with the board "cleared".
    */
   foodSource?: (snake: Cell[]) => Cell | null;
+  /**
+   * Custom provider for the next fruit *with its special-food type* (Session 5).
+   * When set it takes precedence over `foodSource` and random spawning, so the
+   * runtime can roll both the cell and the type. Returning null clears the board.
+   */
+  placedFoodSource?: (snake: Cell[]) => PlacedFood | null;
 }
 
 export function step(state: GameState, options: StepOptions = {}): StepResult {
@@ -148,10 +164,30 @@ export function step(state: GameState, options: StepOptions = {}): StepResult {
   const snake = [head, ...state.snake];
   if (willEat) {
     const score = state.score + pointsPerFruit;
-    const food = options.foodSource ? options.foodSource(snake) : spawnFood(snake, rng);
-    const status: GameStatus = food ? 'running' : 'cleared';
+    const placed = options.placedFoodSource
+      ? options.placedFoodSource(snake)
+      : options.foodSource
+        ? (() => {
+            const cell = options.foodSource!(snake);
+            return cell ? { cell, type: 'normal' as FoodType } : null;
+          })()
+        : (() => {
+            const cell = spawnFood(snake, rng);
+            return cell ? { cell, type: 'normal' as FoodType } : null;
+          })();
+    const status: GameStatus = placed ? 'running' : 'cleared';
     return {
-      state: { snake, direction, turnQueue, food, score, status, runId: state.runId, deathReason: null },
+      state: {
+        snake,
+        direction,
+        turnQueue,
+        food: placed?.cell ?? null,
+        foodType: placed?.type ?? 'normal',
+        score,
+        status,
+        runId: state.runId,
+        deathReason: null,
+      },
       ate: true,
     };
   }

@@ -1,4 +1,7 @@
 import { previousDayKey } from './daily.ts';
+import type { PlayerProfile } from './progression.ts';
+import type { DailyModifier, DailyChallengeParams } from './daily.ts';
+import type { GhostData } from './ghost.ts';
 
 const PREF_PREFIX = 'serpent-pref:';
 
@@ -20,6 +23,15 @@ export const DAILY_KEYS = {
   history: 'serpent-daily-history',
 } as const;
 
+/** Player progression profile (Session 1) — a single versioned JSON blob. */
+export const PROFILE_KEY = 'serpent-profile';
+
+/** Missions (Session 2) — a single versioned JSON blob of active missions. */
+export const MISSIONS_KEY = 'serpent-missions';
+
+/** Ghost data (Session 10) — per-mode ghost replay data. */
+export const GHOST_KEY = 'serpent-ghost';
+
 export interface DailyStatus {
   dateKey: string;
   score: number;
@@ -27,6 +39,10 @@ export interface DailyStatus {
   level: number;
   durationMs: number;
   length: number;
+  /** The modifier that was active for this daily run. */
+  modifier?: DailyModifier;
+  /** The effective parameters for this run. */
+  params?: DailyChallengeParams;
 }
 
 /** Inject a storage backend (used by tests). Pass undefined to restore auto-detect. */
@@ -103,6 +119,8 @@ export function readStoredDailyStatus(): DailyStatus | null {
       level: typeof parsed.level === 'number' ? parsed.level : 1,
       durationMs: typeof parsed.durationMs === 'number' ? parsed.durationMs : 0,
       length: typeof parsed.length === 'number' ? parsed.length : 0,
+      modifier: parsed.modifier,
+      params: parsed.params,
     };
   } catch {
     return null;
@@ -130,6 +148,8 @@ export function readStoredDailyHistory(): Record<string, DailyStatus> {
         level: typeof value.level === 'number' ? value.level : 1,
         durationMs: typeof value.durationMs === 'number' ? value.durationMs : 0,
         length: typeof value.length === 'number' ? value.length : 0,
+        modifier: value.modifier,
+        params: value.params,
       };
     }
     return history;
@@ -170,4 +190,52 @@ export function computeDailyStreak(history: Record<string, DailyStatus>, todayKe
     }
   }
   return streak;
+}
+
+/** Read the raw stored profile blob, or null when absent/corrupt. */
+export function readStoredProfile(): unknown | null {
+  const raw = safeGetItem(PROFILE_KEY);
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the player profile blob. Returns false when storage is unavailable. */
+export function writeStoredProfile(profile: PlayerProfile): boolean {
+  return safeSetItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
+/** Read the raw stored missions blob, or null when absent/corrupt. */
+export function readStoredMissions(): unknown | null {
+  const raw = safeGetItem(MISSIONS_KEY);
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the missions blob. Returns false when storage is unavailable. */
+export function writeStoredMissions(data: unknown): boolean {
+  return safeSetItem(MISSIONS_KEY, JSON.stringify(data));
+}
+
+/** Read the raw stored ghost blob, or null when absent/corrupt. */
+export function readStoredGhost(): Record<string, unknown> | null {
+  const raw = safeGetItem(GHOST_KEY);
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the ghost blob. Returns false when storage is unavailable. */
+export function writeStoredGhost(data: Record<string, unknown>): boolean {
+  return safeSetItem(GHOST_KEY, JSON.stringify(data));
 }

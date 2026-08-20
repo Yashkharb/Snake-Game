@@ -288,6 +288,30 @@ test('sound toggle mutes via the button and the M key, persisting the preference
   await expect(page.locator('#sound-button')).toHaveAttribute('aria-pressed', 'false');
 });
 
+async function waitForFullscreen(page: Page, active: boolean) {
+  // The CSS class flips synchronously, but the browser's real fullscreen
+  // transition is async. If we toggle again while an exit is still in
+  // flight, the re-entry request gets rejected and a stale fullscreenchange
+  // event flips the class back, hiding the in-board controls. Wait for
+  // document.fullscreenElement to settle first. With no Fullscreen API
+  // (pure-CSS fallback) there is nothing async to wait for.
+  await expect
+    .poll(
+      () =>
+        page.evaluate((want) => {
+          const doc = document as Document & { webkitFullscreenElement?: Element | null };
+          const el = document.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
+          const hasApi =
+            'requestFullscreen' in document.documentElement ||
+            'webkitRequestFullscreen' in document.documentElement;
+          if (!hasApi) return true;
+          return Boolean(el) === want;
+        }, active),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+}
+
 test('fullscreen puts the board on the full screen and back again', async ({ page }) => {
   const immersive = () => page.evaluate(() => document.body.classList.contains('is-fullscreen'));
 
@@ -296,6 +320,7 @@ test('fullscreen puts the board on the full screen and back again', async ({ pag
 
   await page.locator('#fullscreen-button').click();
   await expect.poll(immersive).toBe(true);
+  await waitForFullscreen(page, true);
   await expect(page.locator('#fullscreen-button-label')).toHaveText('EXIT');
   // The chrome disappears and the board owns the viewport.
   await expect(page.locator('.topbar')).toBeHidden();
@@ -314,16 +339,22 @@ test('fullscreen puts the board on the full screen and back again', async ({ pag
   await page.locator('#fs-sound').click();
   await expect(page.locator('#fs-sound-label')).toHaveText('SOUND OFF');
 
-  // The F key exits fullscreen.
-  await page.keyboard.press('f');
+  // Exit via the in-board exit button.
+  await page.locator('#fs-exit').click();
   await expect.poll(immersive).toBe(false);
+  await waitForFullscreen(page, false);
   await expect(page.locator('#fullscreen-button-label')).toHaveText('FULLSCREEN');
   await expect(page.locator('.topbar')).toBeVisible();
   await expect(page.locator('.fs-controls')).toBeHidden();
 
-  // Re-enter and leave via the in-board exit button.
+  // Re-enter via the F key, then leave again the same way.
   await page.keyboard.press('f');
   await expect.poll(immersive).toBe(true);
-  await page.locator('#fs-exit').click();
+  await waitForFullscreen(page, true);
+  await expect(page.locator('.fs-controls')).toBeVisible();
+
+  await page.keyboard.press('f');
   await expect.poll(immersive).toBe(false);
+  await waitForFullscreen(page, false);
+  await expect(page.locator('.fs-controls')).toBeHidden();
 });

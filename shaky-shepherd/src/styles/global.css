@@ -205,6 +205,85 @@
     text-transform: uppercase;
   }
 
+  /* Long-form prose for the info pages (About, Privacy, Terms, Contact).
+     Lives in the component layer so slotted page content picks it up
+     regardless of Astro's per-page style scoping. */
+  .page-prose h2 {
+    margin: 34px 0 12px;
+    color: var(--color-ink);
+    font-size: 21px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  .page-prose p {
+    margin: 0 0 16px;
+    color: var(--color-body);
+    font-size: 15px;
+    line-height: 1.75;
+    text-wrap: pretty;
+  }
+
+  .page-prose p strong {
+    color: var(--color-ink);
+    font-weight: 500;
+  }
+
+  .page-prose ul {
+    margin: 0 0 4px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .page-prose li {
+    position: relative;
+    padding: 0 0 10px 18px;
+    color: var(--color-body);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .page-prose li::before {
+    position: absolute;
+    top: 0.62em;
+    left: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-sunset);
+    content: "";
+  }
+
+  .page-prose li strong {
+    color: var(--color-ink);
+    font-weight: 500;
+  }
+
+  .page-prose a {
+    color: var(--color-sunset-soft);
+    text-decoration: none;
+  }
+
+  .page-prose a:hover {
+    color: var(--color-ink);
+  }
+
+  .page-prose hr {
+    margin: 28px 0;
+    border: 0;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  @media (max-width: 700px) {
+    .page-prose h2 {
+      font-size: 19px;
+    }
+    .page-prose p,
+    .page-prose li {
+      font-size: 14px;
+    }
+  }
+
   /* Touch-first devices: roomier targets, drop keyboard hints. */
   @media (pointer: coarse) {
     .btn-pill {

@@ -1,0 +1,78 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+---
+
+<PageLayout
+  title="Privacy Policy — Snake Game Online"
+  description="Snake Game's privacy policy. We collect no personal data, store your scores only in your browser, and use anonymous analytics. Learn exactly what we do and don't track."
+  eyebrow="PRIVACY POLICY"
+  heading="Your privacy, kept simple."
+  kicker="This page explains what Snake Game collects, what it stores, and what it never touches. The short version: we don't ask for personal data, and the game works fully on your device."
+>
+  <h2>Last updated</h2>
+  <p>August 20, 2026</p>
+
+  <h2>What we collect</h2>
+  <p>
+    Snake Game is a client-side game. It runs entirely in your browser, and we operate no user
+    accounts and no login system. We do <strong>not</strong> collect your name, email address,
+    or any other personal information.
+  </p>
+
+  <h2>Local storage on your device</h2>
+  <p>
+    To make the game feel instant and work offline, Snake Game saves some data in your
+    browser's <strong>local storage</strong>. This stays on your device and never leaves it.
+  </p>
+  <ul>
+    <li><strong>Best scores and best lengths</strong> for each game mode.</li>
+    <li><strong>Your Daily challenge history and streak.</strong></li>
+    <li><strong>Preferences</strong> such as your sound setting and chosen mode.</li>
+  </ul>
+  <p>
+    Clearing your browser's site data will reset these. Because it all lives in your browser,
+    it is never shared with us or with anyone else.
+  </p>
+
+  <h2>Analytics</h2>
+  <p>
+    We use Google Analytics (GA4) to understand aggregate usage — for example, how many people
+    play each mode and how often runs end. These events are anonymous and do not include
+    personal data, and they help us keep the game fast and fix what breaks. Google Analytics is
+    provided by Google LLC and may set its own cookies; its handling of that data is governed by
+    Google's privacy policy.
+  </p>
+
+  <h2>Cookies</h2>
+  <p>
+    Snake Game itself does not set cookies. Google Analytics, described above, may set cookies
+    in line with its own policies. You can block or delete cookies in your browser at any time
+    without losing the ability to play.
+  </p>
+
+  <h2>Third-party services</h2>
+  <ul>
+    <li><strong>Google Analytics</strong> (Google LLC) — anonymous usage analytics.</li>
+    <li><strong>GitHub Pages</strong> (GitHub, Inc.) — hosting for the game.</li>
+  </ul>
+  <p>Neither service is used to track you across the site for advertising, and we show no ads.</p>
+
+  <h2>Children's privacy</h2>
+  <p>
+    Snake Game is appropriate for all ages and collects no personal information from anyone,
+    including children under 13. If you believe a child has submitted personal data to us,
+    <a href={`${import.meta.env.BASE_URL}contact/`}>contact us</a> and we will remove it.
+  </p>
+
+  <h2>Changes to this policy</h2>
+  <p>
+    If we change anything about how the game handles your data, we will update this page. The
+    "Last updated" date at the top reflects the most recent change.
+  </p>
+
+  <h2>Contact</h2>
+  <p>
+    Questions about this policy? Email us at
+    <a href="mailto:yashkharb37@gmail.com">yashkharb37@gmail.com</a>.
+  </p>
+</PageLayout>

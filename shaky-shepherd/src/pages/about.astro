@@ -1,0 +1,60 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+---
+
+<PageLayout
+  title="About Us — Snake Game Online"
+  description="Snake Game is the classic arcade game, sharpened for your browser. Free, no account, no ads, and playable on any device. Learn about the game and who built it."
+  eyebrow="ABOUT SNAKE GAME"
+  heading="The classic, sharpened for your browser."
+  kicker="Snake Game is a free online recreation of the arcade classic — rebuilt for modern browsers with no downloads, no accounts, and no ads."
+>
+  <p>
+    Snake Game is the classic arcade game of growing a snake on a square board. You steer the
+    snake toward the fruit; every fruit you eat adds a segment and scores points. The board
+    never grows, so the longer you get, the harder every turn becomes — hit a wall or your own
+    tail and the run is over.
+  </p>
+
+  <h2>Why we built it</h2>
+  <p>
+    The game runs entirely in your browser. There is nothing to install, no account to create,
+    and no advertisement to sit through — you press <strong>Space</strong> and you are playing.
+    Everything, including your best scores and the daily challenge, is stored on your own
+    device, so you are never locked in to a server or a login.
+  </p>
+
+  <h2>Four ways to play</h2>
+  <ul>
+    <li>
+      <strong>Classic</strong> — the original rules. Eat fruit, grow, and don't hit the wall
+      or your own tail.
+    </li>
+    <li>
+      <strong>Time Attack</strong> — 60 seconds on the clock. Same rules as Classic, but the
+      clock is your opponent.
+    </li>
+    <li>
+      <strong>Zen</strong> — walls wrap around. Leave one edge and you appear on the other;
+      only your own tail can end the run.
+    </li>
+    <li>
+      <strong>Daily</strong> — a seeded challenge for your local calendar day. Complete the
+      day's 60 fruits to keep your streak alive.
+    </li>
+  </ul>
+
+  <h2>Privacy by design</h2>
+  <p>
+    We do not collect personal data, and we never will. The game is fully client-side, your
+    scores live only in your browser's local storage, and the only analytics we use are
+    anonymous page-view and gameplay events. See the
+    <a href={`${import.meta.env.BASE_URL}privacy/`}>Privacy Policy</a> for the full picture.
+  </p>
+
+  <h2>Who built it</h2>
+  <p>
+    Snake Game is built and maintained by Yash Kharb. It is free to play — if you have
+    feedback, a feature request, or just found a bug, <a href={`${import.meta.env.BASE_URL}contact/`}>get in touch</a>.
+  </p>
+</PageLayout>

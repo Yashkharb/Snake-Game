@@ -1,0 +1,98 @@
+---
+import Layout from './Layout.astro';
+import TopBar from '../components/TopBar.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  eyebrow: string;
+  heading: string;
+  kicker?: string;
+}
+
+const { title, description, eyebrow, heading, kicker } = Astro.props;
+const home = import.meta.env.BASE_URL;
+---
+
+<Layout title={title} description={description}>
+  <main class="page-shell">
+    <TopBar />
+
+    <section class="page-band" aria-labelledby="page-heading">
+      <p class="eyebrow page-eyebrow">{eyebrow}</p>
+      <h1 id="page-heading" class="display-tight">{heading}</h1>
+      {kicker && <p class="page-kicker">{kicker}</p>}
+
+      <div class="page-prose">
+        <slot />
+      </div>
+
+      <a class="btn-pill back-link" href={home}>Back to the game</a>
+    </section>
+
+    <SiteFooter />
+  </main>
+</Layout>
+
+<style>
+  .page-shell {
+    position: relative;
+    width: min(1240px, 100%);
+    min-height: 100vh;
+    margin: 0 auto;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: max(env(safe-area-inset-right, 0px), clamp(20px, 4vw, 64px));
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 40px);
+    padding-left: max(env(safe-area-inset-left, 0px), clamp(20px, 4vw, 64px));
+  }
+
+  .page-band {
+    max-width: 720px;
+    margin: 0 auto;
+    padding-top: 56px;
+  }
+
+  .page-eyebrow {
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  h1 {
+    margin: 14px 0 16px;
+    font-size: clamp(38px, 5.4vw, 68px);
+  }
+
+  .page-kicker {
+    max-width: 520px;
+    margin: 0 0 28px;
+    color: var(--color-mute);
+    font-size: 16px;
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  .back-link {
+    margin-top: 40px;
+    text-decoration: none;
+  }
+
+  @media (max-width: 700px) {
+    .page-band {
+      padding-top: 36px;
+    }
+    .page-eyebrow {
+      font-size: 10px;
+    }
+    h1 {
+      margin: 10px 0 12px;
+      font-size: 32px;
+    }
+    .page-kicker {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .back-link {
+      width: 100%;
+    }
+  }
+</style>

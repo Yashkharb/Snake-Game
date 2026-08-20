@@ -1,0 +1,39 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+---
+
+<PageLayout
+  title="Contact Us — Snake Game Online"
+  description="Get in touch about Snake Game. Report a bug, suggest a feature, or ask a question. Free support by email or GitHub."
+  eyebrow="CONTACT"
+  heading="Get in touch."
+  kicker="Found a bug, want a new mode, or just have a question? We'd love to hear from you. Snake Game is free to play and so is our support."
+>
+  <h2>Email</h2>
+  <p>
+    For bug reports, feature ideas, or anything else, write to
+    <a href="mailto:yashkharb37@gmail.com">yashkharb37@gmail.com</a>. We read everything and
+    usually reply within a few days.
+  </p>
+
+  <h2>GitHub</h2>
+  <p>
+    Snake Game is open source. You can report issues, suggest improvements, or look at the
+    code at <a href="https://github.com/Yashkharb/Snake-Game" rel="noopener noreferrer">github.com/Yashkharb/Snake-Game</a>.
+  </p>
+
+  <h2>What to include</h2>
+  <ul>
+    <li>Which <strong>mode</strong> you were playing (Classic, Time Attack, Zen, or Daily).</li>
+    <li>What <strong>browser and device</strong> you were using.</li>
+    <li>A short description of <strong>what happened</strong> and what you expected instead.</li>
+  </ul>
+
+  <h2>Before you write</h2>
+  <p>
+    Check the <a href={`${import.meta.env.BASE_URL}about/`}>About page</a> for how the modes
+    work, and the <a href={`${import.meta.env.BASE_URL}privacy/`}>Privacy Policy</a> for how
+    your data is handled. Many questions — like "where are my scores saved?" — are answered
+    there.
+  </p>
+</PageLayout>

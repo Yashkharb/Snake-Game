@@ -520,6 +520,11 @@
     .game-overlay {
       padding: 18px;
     }
+    /* Move mode badge down in fullscreen to avoid overlapping fs-controls. */
+    body.is-fullscreen .mode-badge {
+      top: 50px;
+    }
+  }
     /* The Daily Challenge screen reads as a card: top-align it so the Play
        challenge CTA stays above the fold on small portrait phones. */
     .game-overlay.is-daily {

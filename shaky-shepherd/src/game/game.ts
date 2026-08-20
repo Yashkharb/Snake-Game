@@ -165,7 +165,7 @@ const fsSoundLabel = requireElement('fs-sound-label');
 const fsExitButton = requireElement<HTMLButtonElement>('fs-exit');
 
 // Crisp rendering on high-density displays while keeping 800×800 logical units.
-const dpr = Math.min(window.devicePixelRatio || 1, 2);
+const dpr = /Mobi|Android/i.test(navigator.userAgent) ? 1 : Math.min(window.devicePixelRatio || 1, 2);
 canvas.width = Math.round(SIZE * dpr);
 canvas.height = Math.round(SIZE * dpr);
 ctx.scale(dpr, dpr);

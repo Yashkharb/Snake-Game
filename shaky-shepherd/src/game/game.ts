@@ -1224,7 +1224,7 @@ function wireInput() {
     const dy = event.clientY - touchStart.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 16) return;
     setDirection(Math.abs(dx) > Math.abs(dy) ? { x: Math.sign(dx), y: 0 } : { x: 0, y: Math.sign(dy) });
-    touchStart = { x: event.clientX, y: event.clientY };
+    touchStart = undefined;
   };
 
   canvas.addEventListener('pointerdown', (event) => {

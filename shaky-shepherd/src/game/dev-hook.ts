@@ -5,8 +5,6 @@
 import type { GameModeId } from './modes.ts';
 import type { DailyChallenge } from './daily.ts';
 import type { PlayerProfile } from './progression.ts';
-import type { GhostData, GhostSnapshot } from './ghost.ts';
-import type { ChallengeData } from './challenge.ts';
 
 /** Development-only debug hook exposed on `window.__serpent`. */
 export function installDevHook(

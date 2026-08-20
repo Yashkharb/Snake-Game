@@ -163,6 +163,24 @@
     }
   }
 
+  /* ≤480px portrait: even more compact. */
+  @media (max-width: 480px) {
+    .info-rail {
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .guide-card {
+      padding: 12px;
+    }
+    .fruit-sample {
+      width: 28px;
+      height: 28px;
+    }
+    .pause-button {
+      min-height: 48px;
+    }
+  }
+
   /* Short landscape: slim right rail beside the board. */
   @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {
     .info-rail {

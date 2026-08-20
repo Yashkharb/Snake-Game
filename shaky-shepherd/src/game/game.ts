@@ -1449,7 +1449,7 @@ async function shareChallenge() {
   // Generate a challenge from the current run
   const challenge = createChallengeFromRun(activeMode.id, game.score);
   const challengeText = buildChallengeShareMessage(challenge);
-  const challengeLink = (window as any).__serpentChallengeLink;
+  const challengeLink = `${window.location.origin}/${encodeChallenge(challenge)}`;
 
   const base = eventParams({ is_new_best: isNewBest, duration: Math.round(lastRunMs / 1000) });
   let method: 'web-share' | 'clipboard' | 'unsupported' = 'unsupported';
@@ -1492,6 +1492,55 @@ async function copyResult() {
   } catch (error) {
     console.warn('[serpent] copy failed:', error);
   }
+}
+
+/** Determine the next goal for the player to pursue. */
+function getNextGoal(profile: PlayerProfile, mode: GameModeId): { text: string } | null {
+  const rank = rankProgress(profile.xp);
+  const nextRank = rank.next;
+  
+  // 1. Next rank
+  if (nextRank) {
+    const xpNeeded = nextRank.minXp - profile.xp;
+    return { text: `Reach ${nextRank.name} (${xpNeeded} XP)` };
+  }
+
+  // 2. Next mission (check active missions)
+  const activeMissions = missionSave.active.filter(m => !m.completed);
+  if (activeMissions.length > 0) {
+    const m = activeMissions[0];
+    const remaining = m.target - m.progress;
+    return { text: `Complete "${m.title}" (${remaining} more)` };
+  }
+
+  // 3. Next streak reward
+  const streakRewards = STREAK_REWARDS.filter(r => r.day > (profile.streakRewardsClaimed?.length || 0));
+  if (streakRewards.length > 0) {
+    const next = streakRewards[0];
+    const currentStreak = computeDailyStreak(readStoredDailyHistory(), dailyDateKey());
+    const daysNeeded = next.day - currentStreak;
+    if (daysNeeded > 0) {
+      return { text: `Reach ${next.day}-day streak for ${next.label} (${daysNeeded} more days)` };
+    }
+  }
+
+  // 4. Next weekly goal
+  const weeklyGoals = weeklyGoalsSave.active.filter(g => !g.completed);
+  if (weeklyGoals.length > 0) {
+    const g = weeklyGoals[0];
+    const remaining = g.target - g.progress;
+    return { text: `Weekly: ${g.title} (${remaining} more)` };
+  }
+
+  // 5. Next cosmetic unlock
+  const daily = computeDailyStats(readStoredDailyHistory(), dailyDateKey());
+  const availableCosmetics = evaluateCosmetics(profile, daily);
+  if (availableCosmetics.length > 0) {
+    return { text: `Unlock ${availableCosmetics[0].name} cosmetic` };
+  }
+
+  // 6. Next rank/XP goal (if at max rank)
+  return { text: 'Max rank achieved! Chase a new personal best.' };
 }
 
 function endGame(reason: DeathReason | 'cleared' = 'wall') {
@@ -2671,7 +2720,7 @@ shareButton.addEventListener('click', () => {
   });
 }
 
-export function mountGame() {
+export async function mountGame() {
   try {
     createStars();
     backgroundCache = createBackgroundCache();
@@ -2707,43 +2756,45 @@ export function mountGame() {
     updateHud();
     drawBackground(0);
     drawFood(0);
-drawSnake(0);
-    installDevHook(
-      () => game,
-      () => activeMode.id,
-      () => dailyChallenge,
-      () => dailyFoodIndex,
-      () => todayKey,
-      () => profile,
-      () => rankProgress(profile.xp).rank.name,
-      () => missionSave.active,
-      () => profile.unlockedAchievements,
-      () => game.foodType,
-      () => foodEffects,
-      (type: string) => {
-        const valid: FoodType[] = ['normal', 'golden', 'slow', 'multiplier', 'cursed', 'time'];
-        if (valid.includes(type as FoodType)) {
-          game = { ...game, foodType: type as FoodType };
-        }
-      },
-      selectMode,
-      () => eventState,
-      () => eventRules,
-      (id: string) => {
-        if (eventRules.enabled && isEventId(id)) {
-          const def = EVENT_DEFINITIONS[id as EventId];
-          eventState = { activeEventId: id as EventId, eventUntil: currentRunMs() + def.durationMs, lastEventAt: currentRunMs(), triggered: eventState.triggered + 1 };
-          startEvent(id as EventId);
-        }
-      },
-      getGhost,
-      toggleGhostEnabled,
-      getGhostSnakeAtTime,
-      getGhostHeadPosition,
-      createChallengeFromRun,
-      encodeChallenge,
-    );
-    } catch (error) {
+    drawSnake(0);
+    if (import.meta.env.DEV) {
+      installDevHook(
+        () => game,
+        () => activeMode.id,
+        () => dailyChallenge,
+        () => dailyFoodIndex,
+        () => todayKey,
+        () => profile,
+        () => rankProgress(profile.xp).rank.name,
+        () => missionSave.active,
+        () => profile.unlockedAchievements,
+        () => game.foodType,
+        () => foodEffects,
+        (type: string) => {
+          const valid: FoodType[] = ['normal', 'golden', 'slow', 'multiplier', 'cursed', 'time'];
+          if (valid.includes(type as FoodType)) {
+            game = { ...game, foodType: type as FoodType };
+          }
+        },
+        selectMode,
+        () => eventState,
+        () => eventRules,
+        (id: string) => {
+          if (eventRules.enabled && isEventId(id)) {
+            const def = EVENT_DEFINITIONS[id as EventId];
+            eventState = { activeEventId: id as EventId, eventUntil: currentRunMs() + def.durationMs, lastEventAt: currentRunMs(), triggered: eventState.triggered + 1 };
+            startEvent(id as EventId);
+          }
+        },
+        getGhost,
+        toggleGhostEnabled,
+        getGhostSnakeAtTime,
+        getGhostHeadPosition,
+        createChallengeFromRun,
+        encodeChallenge,
+      );
+    }
+  } catch (error) {
     reportFatalError(error);
     throw error;
   }
@@ -2763,53 +2814,4 @@ function scheduleMidnightRefresh() {
     }
     scheduleMidnightRefresh();
   }, delay);
-}
-
-/** Determine the next goal for the player to pursue. */
-function getNextGoal(profile: PlayerProfile, mode: GameModeId): { text: string } | null {
-  const rank = rankProgress(profile.xp);
-  const nextRank = rank.next;
-  
-  // 1. Next rank
-  if (nextRank) {
-    const xpNeeded = nextRank.minXp - profile.xp;
-    return { text: `Reach ${nextRank.name} (${xpNeeded} XP)` };
-  }
-
-  // 2. Next mission (check active missions)
-  const activeMissions = missionSave.active.filter(m => !m.completed);
-  if (activeMissions.length > 0) {
-    const m = activeMissions[0];
-    const remaining = m.target - m.progress;
-    return { text: `Complete "${m.title}" (${remaining} more)` };
-  }
-
-  // 3. Next streak reward
-  const streakRewards = STREAK_REWARDS.filter(r => r.day > (profile.streakRewardsClaimed?.length || 0));
-  if (streakRewards.length > 0) {
-    const next = streakRewards[0];
-    const currentStreak = computeDailyStreak(readStoredDailyHistory(), dailyDateKey());
-    const daysNeeded = next.day - currentStreak;
-    if (daysNeeded > 0) {
-      return { text: `Reach ${next.day}-day streak for ${next.label} (${daysNeeded} more days)` };
-    }
-  }
-
-  // 4. Next weekly goal
-  const weeklyGoals = weeklyGoalsSave.active.filter(g => !g.completed);
-  if (weeklyGoals.length > 0) {
-    const g = weeklyGoals[0];
-    const remaining = g.target - g.progress;
-    return { text: `Weekly: ${g.title} (${remaining} more)` };
-  }
-
-  // 5. Next cosmetic unlock
-  const daily = computeDailyStats(readStoredDailyHistory(), dailyDateKey());
-  const availableCosmetics = evaluateCosmetics(profile, daily);
-  if (availableCosmetics.length > 0) {
-    return { text: `Unlock ${availableCosmetics[0].name} cosmetic` };
-  }
-
-  // 6. Next rank/XP goal (if at max rank)
-  return { text: 'Max rank achieved! Chase a new personal best.' };
 }

@@ -110,6 +110,28 @@
     }
   }
 
+  /* ≤480px portrait: even more compact scoreboard. */
+  @media (max-width: 480px) {
+    .stat-rail {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+    }
+    .stat-card {
+      min-height: 72px;
+      padding: 8px 8px;
+    }
+    .stat-value {
+      font-size: 18px;
+    }
+    .stat-label {
+      font-size: 10px;
+    }
+    .stat-detail {
+      font-size: 8px;
+    }
+  }
+
   /* Short landscape: slim left rail beside the board. */
   @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {
     .stat-rail {

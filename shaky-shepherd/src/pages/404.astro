@@ -1,0 +1,40 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<PageLayout
+  title="404 — Page Not Found | Snake Game"
+  description="This page doesn't exist. Head back to Snake Game and keep playing — the classic arcade game online, free and in your browser."
+  eyebrow="ERROR 404 · NOT FOUND"
+  heading="This cell is empty."
+  kicker="The page you're looking for isn't here. It may have moved, the link may be stale, or the address may be wrong."
+  robots="noindex, nofollow"
+>
+  <p class="error-code" aria-hidden="true">404</p>
+
+  <p>
+    While you're here, the board is still live. Jump back into the game, or take a look at the
+    rest of the site:
+  </p>
+  <ul>
+    <li><a href={base + 'about/'}>About Snake Game</a></li>
+    <li><a href={base + 'privacy/'}>Privacy Policy</a></li>
+    <li><a href={base + 'terms/'}>Terms and Conditions</a></li>
+    <li><a href={base + 'contact/'}>Contact Us</a></li>
+  </ul>
+</PageLayout>
+
+<style>
+  .error-code {
+    margin: 0 0 28px;
+    color: rgba(255, 255, 255, 0.07);
+    font-size: clamp(96px, 22vw, 220px);
+    font-weight: 400;
+    letter-spacing: -0.05em;
+    line-height: 0.9;
+    text-wrap: balance;
+    user-select: none;
+  }
+</style>

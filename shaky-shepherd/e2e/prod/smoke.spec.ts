@@ -69,6 +69,18 @@ test('mode switching updates the badge and the start-screen rule note', async ({
   await expect(page.locator('#mode-badge')).toHaveText('TIME ATTACK');
 });
 
+test('custom error pages ship with the expected copy', async ({ page }) => {
+  await page.goto('/Snake-Game/404.html');
+  await expect(page).toHaveTitle(/404/);
+  await expect(page.locator('h1')).toContainText('This cell is empty');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
+
+  await page.goto('/Snake-Game/500.html');
+  await expect(page).toHaveTitle(/500/);
+  await expect(page.locator('h1')).toContainText('Something hit the wall');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
+});
+
 test('desktop and portrait mobile layouts fit without overflow', async ({ page }) => {
   for (const viewport of [
     { width: 1280, height: 800 },

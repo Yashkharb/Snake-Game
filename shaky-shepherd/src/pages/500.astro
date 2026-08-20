@@ -1,0 +1,44 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+
+interface Props {
+  error: unknown;
+}
+
+const base = import.meta.env.BASE_URL;
+---
+
+<PageLayout
+  title="500 — Something Went Wrong | Snake Game"
+  description="An unexpected error happened on Snake Game. Try again in a moment — the classic arcade game is free to play in your browser."
+  eyebrow="ERROR 500 · SERVER ERROR"
+  heading="Something hit the wall."
+  kicker="An unexpected error happened on our side. It's usually temporary — try again in a moment."
+  robots="noindex, nofollow"
+>
+  <p class="error-code" aria-hidden="true">500</p>
+
+  <p>
+    If this keeps happening, let us know — <a href={base + 'contact/'}>get in touch</a> and
+    tell us what you were doing. In the meantime, you can head back to the game:
+  </p>
+  <ul>
+    <li><a href={base + 'about/'}>About Snake Game</a></li>
+    <li><a href={base + 'privacy/'}>Privacy Policy</a></li>
+    <li><a href={base + 'terms/'}>Terms and Conditions</a></li>
+    <li><a href={base + 'contact/'}>Contact Us</a></li>
+  </ul>
+</PageLayout>
+
+<style>
+  .error-code {
+    margin: 0 0 28px;
+    color: rgba(255, 255, 255, 0.07);
+    font-size: clamp(96px, 22vw, 220px);
+    font-weight: 400;
+    letter-spacing: -0.05em;
+    line-height: 0.9;
+    text-wrap: balance;
+    user-select: none;
+  }
+</style>

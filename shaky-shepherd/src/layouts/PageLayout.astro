@@ -9,13 +9,14 @@ interface Props {
   eyebrow: string;
   heading: string;
   kicker?: string;
+  robots?: string;
 }
 
-const { title, description, eyebrow, heading, kicker } = Astro.props;
+const { title, description, eyebrow, heading, kicker, robots } = Astro.props;
 const home = import.meta.env.BASE_URL;
 ---
 
-<Layout title={title} description={description}>
+<Layout title={title} description={description} robots={robots}>
   <main class="page-shell">
     <TopBar />
 

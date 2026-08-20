@@ -10,7 +10,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test": "node --test src/game/core.test.ts src/game/modes.test.ts src/game/daily.test.ts"
+    "test": "node --test src/game/core.test.ts src/game/modes.test.ts src/game/daily.test.ts src/game/timing.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
+    "@playwright/test": "^1.62.1",
     "typescript": "^6.0.3"
   }
 }

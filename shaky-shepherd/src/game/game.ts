@@ -18,18 +18,23 @@ import type { GameMode, GameModeId } from './modes.ts';
 import {
   buildDailyShareMessage,
   dailyDateKey,
+  dailyFoodFor,
+  DAILY_FOOD_COUNT,
   formatDailyDate,
   generateDailyChallenge,
 } from './daily.ts';
 import type { DailyChallenge } from './daily.ts';
+import { advanceLastMove, interpolationAlpha, isMoveDue } from './timing.ts';
 import { trackEvent } from '../lib/analytics.ts';
 import type { AnalyticsParams } from '../lib/analytics.ts';
 import {
   readPreference,
   readStoredDailyStatus,
+  recordDailyResult,
+  readStoredDailyHistory,
+  computeDailyStreak,
   readStoredNumber,
   writePreference,
-  writeStoredDailyStatus,
   writeStoredNumber,
 } from './storage.ts';
 
@@ -127,11 +132,14 @@ const finalBestEl = requireElement('final-best');
 const finalLevelEl = requireElement('final-level');
 const finalLengthEl = requireElement('final-length');
 const finalLongestEl = requireElement('final-longest');
+const finalRecordEl = requireElement('final-record');
 const finalFruitEl = requireElement('final-fruit');
 const finalDurationEl = requireElement('final-duration');
 const newBestBadge = requireElement('new-best-badge');
 const shareButton = requireElement<HTMLButtonElement>('share-button');
 const pauseButton = requireElement<HTMLButtonElement>('pause-button');
+const soundButton = requireElement<HTMLButtonElement>('sound-button');
+const soundButtonLabel = requireElement('sound-button-label');
 const statusAnnouncer = requireElement('status-announcer');
 const resumeButton = requireElement<HTMLButtonElement>('resume-button');
 const modePicker = requireElement('mode-picker');
@@ -140,8 +148,10 @@ const startModeNote = requireElement('start-mode-note');
 const startKicker = requireElement('start-kicker');
 const startTitle = requireElement('start-title');
 const startButtonLabel = requireElement('start-button-label');
+const startModeInfo = requireElement('start-mode-info');
 const dailyDateEl = requireElement('daily-date');
 const dailyBestEl = requireElement('daily-best');
+const dailyStreakEl = requireElement('daily-streak');
 const copyButton = requireElement<HTMLButtonElement>('copy-button');
 const copyButtonLabel = requireElement('copy-button-label');
 const shareButtonLabel = requireElement('share-button-label');
@@ -163,6 +173,19 @@ let highScore = 0;
 let bestLength = 0;
 let audioCtx: AudioContext | null = null;
 let audioDisabled = false;
+let muted = readPreference('audio', 'on') === 'off';
+
+function setMuted(next: boolean) {
+  muted = next;
+  writePreference('audio', muted ? 'off' : 'on');
+  soundButton.setAttribute('aria-pressed', String(muted));
+  soundButtonLabel.textContent = muted ? 'SOUND OFF' : 'SOUND ON';
+  announce(muted ? 'Sound muted' : 'Sound on');
+}
+
+function toggleSound() {
+  setMuted(!muted);
+}
 let backgroundCache: OffscreenCanvas | null = null;
 let levelUpFlash = 0;
 let runStart = 0;
@@ -223,6 +246,28 @@ function refreshModeUI() {
   startModeNote.textContent = activeMode.description;
   refreshDailyUI();
   updatePickerState();
+  refreshModeInfo();
+}
+
+// A compact mode-specific stat line under the rules note on the start screen:
+// the 60s target and mode best for Time Attack, the wrap rule for Zen, and the
+// fruits-eaten progress for the Daily challenge.
+function refreshModeInfo() {
+  switch (activeMode.id) {
+    case 'time-attack': {
+      const timeLimit = activeMode.rules.timeLimitMs ?? 0;
+      startModeInfo.textContent = `TARGET ${formatCountdown(timeLimit)} · BEST ${String(highScore).padStart(3, '0')}`;
+      break;
+    }
+    case 'zen':
+      startModeInfo.textContent = 'WALLS WRAP · LEAVE ONE EDGE, APPEAR ON THE OTHER';
+      break;
+    case 'daily':
+      startModeInfo.textContent = `FRUITS ${dailyProgress()} / ${DAILY_FOOD_COUNT}`;
+      break;
+    default:
+      startModeInfo.textContent = 'NO TIME LIMIT · WALLS END THE RUN';
+  }
 }
 
 // Daily Challenge helpers. The challenge is derived purely from the local
@@ -236,6 +281,13 @@ function ensureDailyForToday() {
   dailyFoodIndex = 0;
 }
 
+// Fruits eaten so far in the current daily run (0 before the first fruit).
+// `dailyFoodIndex` counts the next fruit to place, so the first fruit placed
+// (index 0) starts at 1 and progress trails it by exactly one.
+function dailyProgress(): number {
+  return Math.max(0, Math.min(DAILY_FOOD_COUNT, dailyFoodIndex - 1));
+}
+
 function refreshDailyUI() {
   const isDaily = activeMode.id === 'daily';
   startKicker.textContent = isDaily ? 'DAILY CHALLENGE' : 'GET READY';
@@ -244,6 +296,7 @@ function refreshDailyUI() {
   startOverlay.classList.toggle('is-daily', isDaily);
   dailyDateEl.hidden = !isDaily;
   dailyBestEl.hidden = !isDaily;
+  dailyStreakEl.hidden = !isDaily;
   if (isDaily) {
     ensureDailyForToday();
     dailyDateEl.textContent = dailyChallenge ? formatDailyDate(dailyChallenge.dateKey) : '';
@@ -253,16 +306,30 @@ function refreshDailyUI() {
         ? `TODAY ${String(status.score).padStart(3, '0')}${status.completed ? ' · COMPLETED' : ''}`
         : '';
     dailyBestEl.textContent = `BEST ${String(highScore).padStart(3, '0')}${today ? ` · ${today}` : ''}`;
+    const streak = computeDailyStreak(readStoredDailyHistory(), dailyChallenge?.dateKey ?? '');
+    dailyStreakEl.textContent = streak > 0 ? `STREAK ${streak}${streak === 1 ? ' DAY' : ' DAYS'}` : '';
+    dailyStreakEl.hidden = streak === 0;
   }
+  refreshModeInfo();
 }
 
-// Feeds the engine the next fixed fruit from today's challenge. Returns null
-// after the last fruit, which ends the run with the board "cleared".
-function dailyFoodSource(_snake: Cell[]): Cell | null {
+// Feeds the engine the next fruit from today's challenge. Fruit placement is
+// deterministic for the (date, fruit index) pair but snake-aware: it is always
+// chosen from cells the current snake does not occupy, so food can never
+// appear inside the snake. `dailyFoodIndex` is the index of the next fruit to
+// place; returning null after the last fruit ends the run with the board
+// "cleared".
+function dailyFoodSource(snake: Cell[]): Cell | null {
   if (!dailyChallenge) return null;
-  const next = dailyFoodIndex + 1;
-  if (next >= dailyChallenge.foodSequence.length) return null;
-  return dailyChallenge.foodSequence[next];
+  if (dailyFoodIndex >= DAILY_FOOD_COUNT) return null;
+  return dailyFoodFor(dailyChallenge.dateKey, dailyFoodIndex, snake);
+}
+
+// Places fruit index 0 for a fresh daily run and records that one fruit is on
+// the board (`dailyFoodIndex` becomes the next index to place).
+function firstDailyFood(snake: Cell[]): Cell | null {
+  dailyFoodIndex = 1;
+  return dailyChallenge ? dailyFoodFor(dailyChallenge.dateKey, 0, snake) : null;
 }
 
 function updatePickerState() {
@@ -288,10 +355,9 @@ function selectMode(id: GameModeId) {
   const fresh = createInitialState();
   if (id === 'daily') {
     ensureDailyForToday();
-    dailyFoodIndex = 0;
     game = {
       ...fresh,
-      food: dailyChallenge ? (dailyChallenge.foodSequence[0] ?? spawnFood(fresh.snake)) : spawnFood(fresh.snake),
+      food: firstDailyFood(fresh.snake),
     };
   } else {
     game = { ...fresh, food: spawnFood(fresh.snake) };
@@ -311,6 +377,7 @@ function selectMode(id: GameModeId) {
   drawBackground(0);
   drawFood(0);
   drawSnake(0);
+  announce(`${activeMode.name} mode selected. ${activeMode.tagline}`);
   trackEvent('mode_select', { mode: activeMode.id, previous_mode: previous });
 }
 
@@ -342,11 +409,10 @@ function resetGame() {
   prevSnake = game.snake.map(s => ({ ...s }));
   if (activeMode.id === 'daily') {
     ensureDailyForToday();
-    dailyFoodIndex = 0;
     const base = startRun(game);
     game = {
       ...base,
-      food: dailyChallenge ? (dailyChallenge.foodSequence[0] ?? spawnFood(base.snake)) : base.food,
+      food: firstDailyFood(base.snake),
     };
   } else {
     game = startRun(game);
@@ -366,7 +432,10 @@ function startGame() {
   maxLength = game.snake.length;
   runStart = performance.now();
   document.body.classList.add('is-playing');
-  lastMove = performance.now() - getMoveDelay(game.score);
+  // Interpolation starts at alpha 0 (lastMove = now): the snake renders at its
+  // start position and takes its first step one full moveDelay later, so
+  // startup never renders ahead of the simulation.
+  lastMove = performance.now();
   setModePickerVisible(false);
   startOverlay.classList.add('hidden');
   pauseOverlay.classList.add('hidden');
@@ -533,6 +602,7 @@ function endGame(reason: DeathReason | 'cleared' = 'wall') {
   finalLevelEl.textContent = String(getLevel(game.score)).padStart(2, '0');
   finalLengthEl.textContent = String(length);
   finalLongestEl.textContent = String(maxLength);
+  finalRecordEl.textContent = String(bestLength);
   finalFruitEl.textContent = String(fruitCount);
   finalDurationEl.textContent = formatDuration(durationMs);
   newBestBadge.classList.toggle('is-new-best', isNewBest);
@@ -561,7 +631,7 @@ function endGame(reason: DeathReason | 'cleared' = 'wall') {
           : 'You hit the wall.';
 
   if (isDaily) {
-    writeStoredDailyStatus({
+    recordDailyResult({
       dateKey: todayKey,
       score: game.score,
       completed,
@@ -628,7 +698,13 @@ function updateHud() {
     speedNameEl.hidden = false;
     speedNameEl.textContent = SPEED_LABELS[Math.min(SPEED_LABELS.length - 1, Math.floor((level - 1) / 2))];
     speedMeter.style.width = `${Math.min(100, 12 + (level - 1) * 8)}%`;
-    scoreDetail.textContent = game.score ? `LENGTH ${game.snake.length}` : 'EAT FRUIT TO SCORE';
+    if (activeMode.id === 'daily') {
+      scoreDetail.textContent = game.score
+        ? `FRUITS ${dailyProgress()} / ${DAILY_FOOD_COUNT}`
+        : `CHALLENGE · ${DAILY_FOOD_COUNT} FRUITS`;
+    } else {
+      scoreDetail.textContent = game.score ? `LENGTH ${game.snake.length}` : 'EAT FRUIT TO SCORE';
+    }
   }
 }
 
@@ -658,8 +734,7 @@ function createBackgroundCache() {
   octx.fillRect(0, 0, SIZE, SIZE);
 
   for (const star of stars) {
-    const flicker = reducedMotion ? 0.5 : 0.22;
-    octx.fillStyle = `rgba(${star.tone}, ${flicker})`;
+    octx.fillStyle = `rgba(${star.tone}, 0.45)`;
     octx.beginPath();
     octx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
     octx.fill();
@@ -685,18 +760,9 @@ function createBackgroundCache() {
   return offscreen;
 }
 
-function drawBackground(time: number) {
+function drawBackground(_time: number) {
   if (backgroundCache) {
     ctx.drawImage(backgroundCache, 0, 0);
-    if (!reducedMotion) {
-      for (const star of stars) {
-        const flicker = 0.22 + (Math.sin(time * 0.0016 + star.phase) + 1) * 0.16;
-        ctx.fillStyle = `rgba(${star.tone}, ${flicker})`;
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
   } else {
     ctx.clearRect(0, 0, SIZE, SIZE);
     const backdrop = ctx.createRadialGradient(SIZE * 0.5, SIZE * 0.45, 0, SIZE * 0.5, SIZE * 0.47, SIZE * 0.75);
@@ -719,8 +785,7 @@ function drawBackground(time: number) {
     ctx.fillRect(0, 0, SIZE, SIZE);
 
     for (const star of stars) {
-      const flicker = reducedMotion ? 0.5 : 0.22 + (Math.sin(time * 0.0016 + star.phase) + 1) * 0.16;
-      ctx.fillStyle = `rgba(${star.tone}, ${flicker})`;
+      ctx.fillStyle = `rgba(${star.tone}, 0.45)`;
       ctx.beginPath();
       ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
       ctx.fill();
@@ -824,12 +889,9 @@ function drawSnake(interp: number) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  if (!reducedMotion) {
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = 'rgba(255, 122, 23, 0.35)';
-  }
-
-  for (let i = total - 1; i > 0; i--) {
+  // Body strokes carry no shadow: glow is reserved for the short leading
+  // section next to the head so the motion trail stays crisp and cheap.
+  const strokeSegment = (i: number) => {
     const a = segments[i];
     const b = segments[i - 1];
     const ix = lerp(a.px, a.x, interp);
@@ -846,6 +908,20 @@ function drawSnake(interp: number) {
     ctx.moveTo(ix, iy);
     ctx.lineTo(jx, jy);
     ctx.stroke();
+  };
+
+  for (let i = total - 1; i > 0; i--) {
+    strokeSegment(i);
+  }
+
+  if (!reducedMotion) {
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(255, 122, 23, 0.35)';
+    const leading = Math.min(3, total - 1);
+    for (let i = leading; i > 0; i--) {
+      strokeSegment(i);
+    }
+    ctx.shadowBlur = 0;
   }
 
   ctx.shadowBlur = 0;
@@ -909,16 +985,25 @@ function makeBurst(x: number, y: number, color: string, count: number) {
   }
 }
 
-function drawEffects() {
+let lastEffectFrame = 0;
+
+// Particle and ripple motion is scaled by the real frame delta so the effect
+// speed no longer depends on the refresh rate. `stepScale` is relative to a
+// 60 Hz reference frame and clamped so a slow frame cannot teleport effects.
+function drawEffects(time: number) {
+  const dt = lastEffectFrame ? Math.min(50, time - lastEffectFrame) : 16.7;
+  lastEffectFrame = time;
+  const stepScale = dt / 16.667;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   particles = particles.filter((p) => p.life > 0.02);
   for (const p of particles) {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vx *= 0.96;
-    p.vy *= 0.96;
-    p.life *= 0.95;
+    p.x += p.vx * stepScale;
+    p.y += p.vy * stepScale;
+    const decay = Math.pow(0.96, stepScale);
+    p.vx *= decay;
+    p.vy *= decay;
+    p.life *= Math.pow(0.95, stepScale);
     ctx.globalAlpha = p.life;
     ctx.fillStyle = p.color;
     ctx.beginPath();
@@ -928,7 +1013,8 @@ function drawEffects() {
   ripples = ripples.filter((r) => r.age < 1);
   if (ripples.length > MAX_RIPPLES) ripples.length = MAX_RIPPLES;
   for (const r of ripples) {
-    r.age += reducedMotion ? 0.04 : 0.023;
+    const step = (reducedMotion ? 0.04 : 0.023) * stepScale;
+    r.age += step;
     ctx.globalAlpha = 1 - r.age;
     ctx.strokeStyle = `hsla(${r.hue}, 95%, 72%, 0.85)`;
     ctx.lineWidth = 2;
@@ -956,26 +1042,30 @@ function tick(time: number) {
     endGame('time');
     updateHud();
   }
-  const moveDelay = getMoveDelay(game.score);
-  const elapsed = time - lastMove;
-  let interp = 0;
-  if (isRunning() && moveDelay > 0) {
-    interp = Math.min(1, elapsed / moveDelay);
+  const running = isRunning();
+  if (running) {
+    // Advance the simulation first, then move the clock forward. Because
+    // lastMove is bumped to the tick instant, the render alpha below always
+    // starts at 0 right after a move and climbs toward 1 — never backwards.
+    const moveDelay = getMoveDelay(game.score);
+    if (isMoveDue(time, lastMove, moveDelay)) {
+      move();
+      lastMove = advanceLastMove(time, lastMove, moveDelay);
+    }
   }
-  if (isRunning() && elapsed >= moveDelay) {
-    move();
-    lastMove += moveDelay;
-    if (time - lastMove > moveDelay) lastMove = time;
-  }
+  // Render alpha is derived from the post-update timing state. The delay is
+  // re-read after a potential eat so a level-up speed change takes effect
+  // immediately without any jump. A finished run stays at alpha 1 (final cell).
+  const interp = isOver() ? 1 : interpolationAlpha(time, lastMove, getMoveDelay(game.score), running);
   drawBackground(time);
   drawFood(time);
   drawSnake(interp);
-  drawEffects();
+  drawEffects(time);
   if (isActive() || particles.length || ripples.length) animationFrame = requestAnimationFrame(animate);
 }
 
 function playTone(frequency: number, duration: number, type: OscillatorType) {
-  if (audioDisabled) return;
+  if (muted || audioDisabled) return;
   try {
     const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextCtor) throw new Error('Web Audio is not supported');
@@ -1014,6 +1104,10 @@ function wireInput() {
       startGame();
       return;
     }
+    if (event.key === 'm' || event.key === 'M') {
+      toggleSound();
+      return;
+    }
     if (DIRECTIONS[event.key]) {
       event.preventDefault();
       setDirection(DIRECTIONS[event.key]);
@@ -1024,6 +1118,7 @@ function wireInput() {
   requireElement('restart-button').addEventListener('click', startGame);
   requireElement('resume-button').addEventListener('click', togglePause);
   pauseButton.addEventListener('click', togglePause);
+  soundButton.addEventListener('click', toggleSound);
   shareButton.addEventListener('click', () => {
     shareScore().catch((error) => console.warn('[serpent] share failed:', error));
   });
@@ -1096,12 +1191,14 @@ export function mountGame() {
   try {
     createStars();
     backgroundCache = createBackgroundCache();
+    soundButton.setAttribute('aria-pressed', String(muted));
+    soundButtonLabel.textContent = muted ? 'SOUND OFF' : 'SOUND ON';
     ensureDailyForToday();
     const initial = createInitialState();
     if (activeMode.id === 'daily') {
       game = {
         ...initial,
-        food: dailyChallenge ? (dailyChallenge.foodSequence[0] ?? spawnFood(initial.snake)) : spawnFood(initial.snake),
+        food: firstDailyFood(initial.snake),
       };
     } else {
       game = { ...initial, food: spawnFood(initial.snake) };

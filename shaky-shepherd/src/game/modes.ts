@@ -89,7 +89,7 @@ export const GAME_MODES: Record<GameModeId, GameMode> = {
     shortName: 'DAILY',
     tagline: 'One puzzle a day',
     description:
-      'A fixed, seeded puzzle for today. Eat fruit, grow, and don\u2019t hit the wall or your own tail.',
+      'A seeded challenge for your local day. Fruit never lands on the snake, so the board always stays winnable.',
     rules: { wrap: false, timeLimitMs: null, hasObstacles: false },
     scoring: { pointsPerFruit: 10 },
     bestKey: DAILY_KEYS.best,

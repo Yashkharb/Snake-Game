@@ -32,6 +32,22 @@ jobs:
         working-directory: shaky-shepherd
         run: npm ci
 
+      - name: Unit tests
+        working-directory: shaky-shepherd
+        run: npm test
+
+      - name: Astro check
+        working-directory: shaky-shepherd
+        run: npx astro check
+
+      - name: Install Playwright browsers
+        working-directory: shaky-shepherd
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        working-directory: shaky-shepherd
+        run: npm run test:e2e
+
       - name: Build
         working-directory: shaky-shepherd
         run: npm run build

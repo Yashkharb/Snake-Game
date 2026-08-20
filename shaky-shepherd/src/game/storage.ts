@@ -1,3 +1,5 @@
+import { previousDayKey } from './daily.ts';
+
 const PREF_PREFIX = 'serpent-pref:';
 
 type StorageBackend = Pick<Storage, 'getItem' | 'setItem'>;
@@ -15,6 +17,7 @@ export const DAILY_KEYS = {
   best: 'serpent-daily-best',
   bestLength: 'serpent-daily-best-length',
   status: 'serpent-daily-status',
+  history: 'serpent-daily-history',
 } as const;
 
 export interface DailyStatus {
@@ -109,4 +112,62 @@ export function readStoredDailyStatus(): DailyStatus | null {
 /** Persist today's Daily Challenge status. Returns false when storage is unavailable. */
 export function writeStoredDailyStatus(status: DailyStatus): boolean {
   return safeSetItem(DAILY_KEYS.status, JSON.stringify(status));
+}
+
+/** Read the full local history of Daily Challenge results, keyed by dateKey. */
+export function readStoredDailyHistory(): Record<string, DailyStatus> {
+  const raw = safeGetItem(DAILY_KEYS.history);
+  if (raw === null) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, Partial<DailyStatus>>;
+    const history: Record<string, DailyStatus> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!value || typeof value.dateKey !== 'string' || typeof value.score !== 'number') continue;
+      history[key] = {
+        dateKey: value.dateKey,
+        score: value.score,
+        completed: Boolean(value.completed),
+        level: typeof value.level === 'number' ? value.level : 1,
+        durationMs: typeof value.durationMs === 'number' ? value.durationMs : 0,
+        length: typeof value.length === 'number' ? value.length : 0,
+      };
+    }
+    return history;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Record a finished Daily Challenge run: refreshes today's status and upserts
+ * the result into the local history. Returns false when storage is blocked.
+ */
+export function recordDailyResult(status: DailyStatus): boolean {
+  const history = readStoredDailyHistory();
+  history[status.dateKey] = status;
+  const okStatus = writeStoredDailyStatus(status);
+  const okHistory = safeSetItem(DAILY_KEYS.history, JSON.stringify(history));
+  return okStatus && okHistory;
+}
+
+/**
+ * Consecutive completed days ending at `todayKey` — or, when today has not been
+ * completed yet, ending at the previous day (a streak that is still alive and
+ * simply does not count today). A missed day breaks the streak.
+ */
+export function computeDailyStreak(history: Record<string, DailyStatus>, todayKey: string): number {
+  let streak = 0;
+  let cursor = todayKey;
+  while (history[cursor]?.completed) {
+    streak += 1;
+    cursor = previousDayKey(cursor);
+  }
+  if (streak === 0 && history[previousDayKey(todayKey)]?.completed) {
+    let day = previousDayKey(todayKey);
+    while (history[day]?.completed) {
+      streak += 1;
+      day = previousDayKey(day);
+    }
+  }
+  return streak;
 }

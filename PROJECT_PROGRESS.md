@@ -491,14 +491,84 @@ Design: same local calendar date ⇒ identical challenge for every player; no ba
 leaderboards; fruits fixed in advance (player-independent) but can be covered by the snake later
 (documented puzzle property).
 
+## Session 8 (complete) — Timing interpolation + Daily rewrite
+
+- `src/game/timing.ts` — new pure helpers (`timing.test.ts`, 7 tests) for smooth interpolation
+  (`advanceLastMove`, render-alpha derivation) so the canvas never renders ahead of the simulation
+  tick, including after eating (delay change) and after pause/resume.
+- `src/game/daily.ts` — reworked from "60 precomputed fruits" to **lazy, snake-aware** placement:
+  `dailyFoodFor(dateKey, fruitIndex, snake)` resolves each fruit deterministically on a free cell,
+  so covered fruits never stay "lost". `dailyFoodIndex` counts the next fruit to place
+  (`firstDailyFood` sets it to 1); progress = `dailyFoodIndex - 1`; the run clears after exactly
+  `DAILY_FOOD_COUNT` (60) fruits.
+- `src/game/daily.test.ts` — BFS completion simulation proves the seeded daily is always winnable.
+- Total **63 unit tests** green; `npx astro check` 0 errors; `npm run build` passes.
+
+## Session 9 (complete) — Playwright end-to-end suite + CI gates
+
+- New Playwright setup (`@playwright/test ^1.62.1`, Chromium): `playwright.config.ts`, `e2e/dev/`
+  (in-browser dev hooks) and `e2e/prod/` (built output smoke tests).
+- **Root cause found:** Playwright's `webServer` is a **top-level-only** option — a per-project
+  `webServer` is silently ignored (`this.webServers` reads only `userConfig.webServer`), so tests ran
+  against nothing and got `ERR_CONNECTION_REFUSED`. Fixed by moving `webServer` to the top level as a
+  two-entry array (`dev` on 4322, `prod` on 4323, both bound to `127.0.0.1`, `reuseExistingServer:
+  !process.env.CI`).
+- **Second root cause:** Astro 7.x auto-daemonizes `astro dev`/`astro preview` when it detects an
+  agent environment (env-gated by `ASTRO_DEV_BACKGROUND`/`ASTRO_PREVIEW_BACKGROUND`). `scripts/
+  e2e-server.mjs` is a foreground wrapper that sets those vars and stays alive as Playwright's
+  spawned child.
+- `tsconfig.json` now excludes `e2e`, `scripts`, and `playwright.config.ts` from `astro check`
+  (node-side code, not browser scope).
+- e2e test fixes: `__serpent` hook methods are invoked inside `page.evaluate` (returning the hook
+  object loses functions via serialization); the "mode picker locked while running" test now asserts
+  the picker is visible → hidden during a run → visible again after game over.
+- Full suite green: **22 e2e tests** (16 dev + 6 prod); Playwright-managed servers start and are
+  cleaned up after the run.
+- `deploy.yml` now runs `npm test`, `npx astro check`, `npx playwright install --with-deps chromium`,
+  and `npm run test:e2e` before `npm run build`.
+
+## Session 10 (complete) — Mode-aware info + Daily retention
+
+- **Start-screen mode line** (`#start-mode-info`): Classic "NO TIME LIMIT · WALLS END THE RUN",
+  Time Attack `TARGET 01:00 · BEST nnn`, Zen "WALLS WRAP · LEAVE ONE EDGE, APPEAR ON THE OTHER",
+  Daily `FRUITS n / 60`.
+- **Mode-aware score detail** (`#score-detail`): Time Attack `TARGET 01:00`; Daily
+  `CHALLENGE · 60 FRUITS` idle → live `FRUITS n / 60` during a run (from `dailyFoodIndex − 1`);
+  Classic `EAT FRUIT TO SCORE` / `LENGTH n`.
+- **Results screen** — new wide **BEST LENGTH** row (`#final-record`, spans the 3-col grid)
+  surfacing the persisted per-mode best length.
+- **Daily history + streak** (`storage.ts`): `DAILY_KEYS.history` (`serpent-daily-history`),
+  `readStoredDailyHistory`, `recordDailyResult` (upserts a finished run into history while updating
+  today's status), and pure `computeDailyStreak` (consecutive completed days ending today, or ending
+  yesterday while today is pending). `daily.ts` gained `previousDayKey` (month/year-safe). Start
+  screen shows `STREAK n DAYS` when active.
+- `src/components/SeoContent.astro` rewritten: truthful 4-mode explainer + FAQ (no backend /
+  leaderboard, offline, local-storage caveats). `README.md` fully rewritten (modes, controls, dev +
+  test commands, structure, deployment, CSP note).
+- Tests: **67 unit tests** (4 new: history persistence + corrupt history, streak × 2, previousDayKey
+  boundaries). 0 astro errors; build passes.
+
+## Session 11 (complete) — Audio mute, a11y, metadata
+
+- **Sound toggle** (`#sound-button` in InfoRail + `M` key): toggles WebAudio tones, persists under
+  `serpent-pref:audio`, `aria-pressed` reflects state, announced via the status region. New e2e test
+  covers button + keyboard + reload persistence.
+- **A11y** — `#gameover-overlay` is now `role="dialog"` with `aria-labelledby`/`aria-describedby`;
+  focus already moves to the Play-again button when it appears; mode selection announces the new
+  mode + tagline; reduced-motion behavior preserved.
+- **Metadata** — `public/sitemap.xml` `lastmod` bumped to 2026-08-20; CSP documented in the README
+  (incl. the SHA-256 hash caveat for the inline GA snippets).
+- Full suite: **23 e2e tests** green (added the sound-toggle spec).
+
 ## PRODUCT READY STATUS
 
 Status: **READY for production deployment.** Astro site builds cleanly and deploys to GitHub Pages.
 
 ### Gameplay
-- All 4 modes work end-to-end (Classic, Time Attack, Zen, Daily), each with its own best-score
-  persistence; DAILY CHALLENGE is deterministic per local date, auto-flips at local midnight, and
-  has copy/share buttons that include the date.
+- All 4 modes work end-to-end (Classic, Time Attack, Zen, Daily), each with its own best-score and
+  best-length persistence; DAILY CHALLENGE is deterministic per local date, auto-flips at local
+  midnight, shows live fruit progress and a completion streak, and has copy/share buttons that
+  include the date.
 - Board-clear ('cleared') and self-collision end states are logic-tested but not scripted
   end-to-end (board-clear needs 342 fruit; self-collision is impractical to script).
 
@@ -508,41 +578,44 @@ Status: **READY for production deployment.** Astro site builds cleanly and deplo
   667×375, 1280×720, 1440×900). 320×568 is an accepted edge case (CTA needs a small scroll).
 
 ### Performance & correctness
-- 52 unit tests pass (core 33, modes, daily). `astro check`: 0 errors / 0 warnings. Production
-  build passes; dev-only `__serpent` hook and test IDs verified tree-shaken from the shipped
-  bundle; challenge-critical generation never calls `Math.random` (verified in minified output).
+- 67 unit tests pass (core, modes, daily, timing). `astro check`: 0 errors / 0 warnings. Production
+  build passes; dev-only `__serpent` hook and test IDs verified tree-shaken from the shipped bundle;
+  challenge-critical generation never calls `Math.random` (verified in minified output).
+
+### End-to-end
+- Playwright suite green: **23 tests** (17 dev + 6 prod) covering start/steer/pause/restart, mode
+  locking, wall/zen/time/daily endings, best persistence across reload, share/clipboard, sound
+  toggle, status announcements, and desktop/portrait/landscape layout fit. Servers (dev 4322 / prod
+  4323) are auto-managed via the top-level `webServer` array.
 
 ### Accessibility / UX
 - Semantic `<button>` elements with labels, visible focus states, `aria-hidden` decorative layers,
-  sufficient contrast. Known gap: no committed DOM/a11y test suite — verified via ad-hoc CDP
-  harnesses each session.
+  sufficient contrast, `role="dialog"` results overlay, live status announcements, mode-change
+  announcements, reduced-motion support, and an audio mute toggle.
 
 ### Analytics, SEO, sharing
-- GA4 (`G-KKNVC77HXJ`) wired with scroll/first-visible tracking; `<title>`, meta description,
-  OG/Twitter image, canonical URL (`https://yashkharb.github.io/Snake-Game/`), JSON-LD game schema,
-  and robots meta all verified present in the production HTML. Share text includes the daily date.
+- GA4 (`G-KKNVC77HXJ`) wired; `<title>`, meta description, OG/Twitter image, canonical URL
+  (`https://yashkharb.github.io/Snake-Game/`), JSON-LD game schema, robots meta all verified present
+  in the production HTML. Share text includes the daily date. sitemap `lastmod` current.
 
 ### Known gaps (honest)
 - No mid-run persistence (leaving the page loses the run); fixed daily fruit can be covered by the
-  snake later; best *length* is persisted but not surfaced in the UI; no visual regression suite;
-  `frame-ancestors` CSP meta directive ignored by Chrome; test files excluded from `astro check`
-  typing (no `@types/node`).
+  snake later; no visual regression suite (layout is guarded by Playwright bounding-box tests);
+  `frame-ancestors` CSP meta directive ignored by Chrome (the real header isn't served); test files
+  excluded from `astro check` typing (no `@types/node`); board-clear/self-collision not scripted
+  e2e.
 
 ## Future work (ranked by impact)
 
-1. **Best-length UI** — surface the persisted best length per mode in the results overlay (already
-   stored; minimal change, immediate player value).
-2. **Daily history + archive** — store a per-day result log and show "this month" stats; enables a
-   streak counter (biggest engagement lever for a daily mode).
-3. **Mid-run persistence** — snapshot state to `sessionStorage` and restore on reload so a
+1. **Mid-run persistence** — snapshot state to `sessionStorage` and restore on reload so a
    backgrounded tab doesn't end the run.
-4. **Real obstacle/wall-blocker system** — new `'obstacles'` mode with deterministic layouts (reuses
+2. **Daily month archive** — extend the per-day history (already stored) into a browsable "this
+   month" calendar view.
+3. **Real obstacle/wall-blocker system** — new `'obstacles'` mode with deterministic layouts (reuses
    the seeded-PRNG approach from the daily challenge).
-5. **Audio** — Sound effects (crunch, death, tick) and a mute toggle; a WebAudio synth keeps it
-   asset-free. Play is currently silent apart from the one score blip.
-6. **PWA offline support** — manifest + service worker for installable/offline play; the site is
+4. **PWA offline support** — manifest + service worker for installable/offline play; the site is
    fully static, so this is low-effort and high payoff.
-7. **Visual regression suite** — commit Playwright-based screenshots of board/results/mode picker at
+5. **Visual regression suite** — commit Playwright-based screenshots of board/results/mode picker at
    the key viewports to stop layout regressions like the Session 7 CTA-fold fix.
-8. **Share image generation** — render a per-score OG-style image (client-side canvas or serverless)
+6. **Share image generation** — render a per-score OG-style image (client-side canvas or serverless)
    for richer social shares than the generic card.

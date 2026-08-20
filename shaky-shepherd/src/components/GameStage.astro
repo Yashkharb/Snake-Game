@@ -22,7 +22,9 @@
     <p class="overlay-note" id="start-mode-note">
       Standard Snake rules: eat fruit, grow, and don't hit the wall or your own tail.
     </p>
+    <p class="overlay-mode-info" id="start-mode-info" translate="no"></p>
     <p class="overlay-best" id="daily-best" hidden></p>
+    <p class="overlay-streak" id="daily-streak" hidden></p>
     <button class="btn-pill btn-pill--primary" id="start-button">
       <span id="start-button-label">Start run</span><kbd class="keycap">Space</kbd>
     </button>
@@ -38,7 +40,7 @@
     </button>
   </div>
 
-  <div class="game-overlay hidden" id="gameover-overlay">
+  <div class="game-overlay hidden" id="gameover-overlay" role="dialog" aria-labelledby="gameover-title" aria-describedby="gameover-kicker">
     <p class="eyebrow overlay-kicker" id="gameover-kicker">RUN OVER</p>
     <h2 class="display-tight" id="gameover-title">You hit the wall.</h2>
 
@@ -72,6 +74,10 @@
       <div class="result-item">
         <dt translate="no">TIME</dt>
         <dd id="final-duration">0:00</dd>
+      </div>
+      <div class="result-item result-item--wide">
+        <dt translate="no">BEST LENGTH</dt>
+        <dd id="final-record">4</dd>
       </div>
     </dl>
 
@@ -272,6 +278,11 @@
     background: rgba(255, 255, 255, 0.02);
   }
 
+  /* The mode's record length spans the whole grid as a wide strip. */
+  .result-item--wide {
+    grid-column: 1 / -1;
+  }
+
   .result-item dt {
     color: var(--color-mute);
     font-family: var(--font-mono);
@@ -335,6 +346,18 @@
     text-wrap: pretty;
   }
 
+  /* Mode-specific stat line (time target, wrap reminder, daily progress). */
+  .overlay-mode-info {
+    margin: -10px 0 20px;
+    color: rgba(255, 255, 255, 0.55);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.5;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-wrap: pretty;
+  }
+
   /* Daily Challenge identity lines (date + best) — visible only in daily mode.
      The [hidden] selector outranks the .is-daily display rule, so a stale
      hidden attribute always wins. */
@@ -368,10 +391,33 @@
     margin: 0 0 12px;
   }
 
+  .game-overlay.is-daily .overlay-mode-info {
+    margin: -6px 0 14px;
+  }
+
   .game-overlay.is-daily .overlay-best {
     display: block;
-    margin: 0 0 22px;
+    margin: 0 0 14px;
     color: var(--color-sunset);
+  }
+
+  /* Current completion streak, only shown for the Daily challenge. */
+  .overlay-streak {
+    display: none;
+    margin: -8px 0 22px;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .game-overlay.is-daily .overlay-streak {
+    display: block;
+  }
+
+  .game-overlay.is-daily .overlay-streak[hidden] {
+    display: none;
   }
 
   /* Persistent mode indicator, on top of every overlay (incl. results). */
@@ -441,6 +487,10 @@
       margin: -14px 0 14px;
       font-size: 10px;
     }
+    .overlay-mode-info {
+      margin: -8px 0 12px;
+      font-size: 9px;
+    }
     .game-overlay.is-daily .overlay-date {
       margin: -4px 0 8px;
     }
@@ -448,7 +498,10 @@
       margin: 0 0 6px;
     }
     .game-overlay.is-daily .overlay-best {
-      margin: 0 0 12px;
+      margin: 0 0 10px;
+    }
+    .game-overlay.is-daily .overlay-streak {
+      margin: -6px 0 12px;
     }
     .overlay-date,
     .overlay-best {
@@ -507,8 +560,10 @@
     }
     .overlay-text,
     .overlay-note,
+    .overlay-mode-info,
     .overlay-date,
     .overlay-best,
+    .overlay-streak,
     .control-hint,
     .result-grid {
       display: none;

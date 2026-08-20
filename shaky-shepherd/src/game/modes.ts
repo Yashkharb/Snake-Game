@@ -109,7 +109,9 @@ export function getDailyMode(params: DailyChallengeParams): GameMode {
     ...GAME_MODES.daily,
     rules: {
       ...GAME_MODES.daily.rules,
-      wrap: params.wrap,
+      // Daily mode ALWAYS has walls (wrap: false), regardless of modifier.
+      // The 'wraparound' modifier should not affect daily mode.
+      wrap: false,
       timeLimitMs: params.timeLimitMs,
       speedFactor: params.speedFactor,
       foodCount: params.foodCount,

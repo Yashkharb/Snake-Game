@@ -89,6 +89,20 @@ import SiteFooter from '../components/SiteFooter.astro';
     }
   }
 
+  @media (max-width: 480px) {
+    .app-shell {
+      padding-right: max(12px, env(safe-area-inset-right, 0px));
+      padding-left: max(12px, env(safe-area-inset-left, 0px));
+    }
+    .game-layout {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .board-column {
+      gap: 8px;
+    }
+  }
+
   /* Short landscape: three-column arcade layout with slim side rails.
      The board column flexes up to 72vh so it stays fully on screen. */
   @media (max-height: 600px) and (orientation: landscape) and (max-width: 1020px) {

@@ -8,6 +8,10 @@ export default defineConfig({
   site: 'https://yashkharb.github.io',
   base: '/Snake-Game/',
   vite: {
-    plugins: [tailwindcss()]
-  }
+    plugins: [tailwindcss()],
+    build: {
+      minify: 'esbuild',
+      target: 'es2020',
+    },
+  },
 });

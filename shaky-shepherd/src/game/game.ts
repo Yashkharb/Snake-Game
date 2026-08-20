@@ -70,6 +70,7 @@ import {
   getGhost,
   hasValidGhost,
   getGhostSnakeAtTime,
+  getGhostHeadPosition,
   toggleGhostEnabled,
   type GhostData,
   type GhostSnapshot,
@@ -86,6 +87,7 @@ import {
   getChallengerName,
   type ChallengeData,
 } from './challenge.ts';
+import { installDevHook } from './dev-hook.ts';
 import {
   createComboState,
   expireCombo,
@@ -2168,7 +2170,7 @@ function drawSnake(interp: number) {
 
   // Render personal ghost first (behind the current snake)
   if (hasValidGhost(profile, activeMode.id) && ghostData.enabled && !reducedMotion) {
-    const ghostSnake = getGhostSnakeAtTime(ghostData, currentRunMs(), interp);
+    const ghostSnake = getGhostSnakeAtTime(ghostData, currentRunMs());
     if (ghostSnake) {
       drawGhostSnake(ghostSnake);
     }
@@ -2705,41 +2707,43 @@ export function mountGame() {
     updateHud();
     drawBackground(0);
     drawFood(0);
-    drawSnake(0);
-    if (import.meta.env.DEV) {
-      (window as unknown as { __serpent?: object }).__serpent = {
-        getGame: () => game,
-        getMode: () => activeMode.id,
-        getDaily: () => dailyChallenge,
-        getDailyFoodIndex: () => dailyFoodIndex,
-        getTodayKey: () => todayKey,
-        getProfile: () => profile,
-        getRank: () => rankProgress(profile.xp).rank.name,
-        getMissions: () => missionSave.active,
-        getAchievements: () => profile.unlockedAchievements,
-        getFoodType: () => game.foodType,
-        getFoodEffects: () => foodEffects,
-        forceFoodType: (type: string) => {
-          const valid: FoodType[] = ['normal', 'golden', 'slow', 'multiplier', 'cursed', 'time'];
-          if (valid.includes(type as FoodType)) {
-            game = { ...game, foodType: type as FoodType };
-          }
-        },
-        selectMode: (id: string) => {
-          if (isGameModeId(id)) selectMode(id);
-        },
-        getEvents: () => eventState,
-        getEventRules: () => eventRules,
-        forceEvent: (id: string) => {
-          if (eventRules.enabled && isEventId(id)) {
-            const def = EVENT_DEFINITIONS[id as EventId];
-            eventState = { activeEventId: id as EventId, eventUntil: currentRunMs() + def.durationMs, lastEventAt: currentRunMs(), triggered: eventState.triggered + 1 };
-            startEvent(id as EventId);
-          }
-        },
-      };
-    }
-  } catch (error) {
+drawSnake(0);
+    installDevHook(
+      () => game,
+      () => activeMode.id,
+      () => dailyChallenge,
+      () => dailyFoodIndex,
+      () => todayKey,
+      () => profile,
+      () => rankProgress(profile.xp).rank.name,
+      () => missionSave.active,
+      () => profile.unlockedAchievements,
+      () => game.foodType,
+      () => foodEffects,
+      (type: string) => {
+        const valid: FoodType[] = ['normal', 'golden', 'slow', 'multiplier', 'cursed', 'time'];
+        if (valid.includes(type as FoodType)) {
+          game = { ...game, foodType: type as FoodType };
+        }
+      },
+      selectMode,
+      () => eventState,
+      () => eventRules,
+      (id: string) => {
+        if (eventRules.enabled && isEventId(id)) {
+          const def = EVENT_DEFINITIONS[id as EventId];
+          eventState = { activeEventId: id as EventId, eventUntil: currentRunMs() + def.durationMs, lastEventAt: currentRunMs(), triggered: eventState.triggered + 1 };
+          startEvent(id as EventId);
+        }
+      },
+      getGhost,
+      toggleGhostEnabled,
+      getGhostSnakeAtTime,
+      getGhostHeadPosition,
+      createChallengeFromRun,
+      encodeChallenge,
+    );
+    } catch (error) {
     reportFatalError(error);
     throw error;
   }

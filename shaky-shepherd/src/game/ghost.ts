@@ -145,8 +145,7 @@ export function updateGhostIfNewBest(
 /** Get the ghost snake position at a specific time for rendering. */
 export function getGhostSnakeAtTime(
   ghost: GhostData,
-  currentTimeMs: number,
-  interpolationAlpha: number
+  currentTimeMs: number
 ): Cell[] | null {
   if (!ghost || ghost.snapshots.length === 0) return null;
 

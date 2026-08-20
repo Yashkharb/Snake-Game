@@ -287,3 +287,43 @@ test('sound toggle mutes via the button and the M key, persisting the preference
   await expect(page.locator('#sound-button-label')).toHaveText('SOUND ON');
   await expect(page.locator('#sound-button')).toHaveAttribute('aria-pressed', 'false');
 });
+
+test('fullscreen puts the board on the full screen and back again', async ({ page }) => {
+  const immersive = () => page.evaluate(() => document.body.classList.contains('is-fullscreen'));
+
+  await expect(page.locator('#fullscreen-button')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#fullscreen-button-label')).toHaveText('FULLSCREEN');
+
+  await page.locator('#fullscreen-button').click();
+  await expect.poll(immersive).toBe(true);
+  await expect(page.locator('#fullscreen-button-label')).toHaveText('EXIT');
+  // The chrome disappears and the board owns the viewport.
+  await expect(page.locator('.topbar')).toBeHidden();
+  await expect(page.locator('.hero')).toBeHidden();
+  await expect(page.locator('.stat-rail')).toBeHidden();
+  await expect(page.locator('.info-rail')).toBeHidden();
+  await expect(page.locator('.mode-picker')).toBeHidden();
+  await expect(page.locator('.touch-controls')).toBeHidden();
+  await expect(page.locator('.fs-controls')).toBeVisible();
+
+  // Fullscreen controls stay functional: pause + sound.
+  await page.keyboard.press('Space');
+  await expect.poll(() => getGame(page).then((g) => g.status)).toBe('running');
+  await page.locator('#fs-pause').click();
+  await expect.poll(() => getGame(page).then((g) => g.status)).toBe('paused');
+  await page.locator('#fs-sound').click();
+  await expect(page.locator('#fs-sound-label')).toHaveText('SOUND OFF');
+
+  // The F key exits fullscreen.
+  await page.keyboard.press('f');
+  await expect.poll(immersive).toBe(false);
+  await expect(page.locator('#fullscreen-button-label')).toHaveText('FULLSCREEN');
+  await expect(page.locator('.topbar')).toBeVisible();
+  await expect(page.locator('.fs-controls')).toBeHidden();
+
+  // Re-enter and leave via the in-board exit button.
+  await page.keyboard.press('f');
+  await expect.poll(immersive).toBe(true);
+  await page.locator('#fs-exit').click();
+  await expect.poll(immersive).toBe(false);
+});

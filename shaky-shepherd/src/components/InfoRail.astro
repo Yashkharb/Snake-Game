@@ -28,6 +28,14 @@
     <span id="sound-button-label" translate="no">SOUND ON</span>
     <kbd class="keycap" translate="no">M</kbd>
   </button>
+
+  <button class="btn-pill pause-button" id="fullscreen-button" type="button" aria-pressed="false">
+    <svg class="fs-icon" aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
+    </svg>
+    <span id="fullscreen-button-label" translate="no">FULLSCREEN</span>
+    <kbd class="keycap" translate="no">F</kbd>
+  </button>
 </aside>
 
 <style>
@@ -114,6 +122,13 @@
     color: var(--color-sunset);
     font-size: 17px;
     line-height: 1;
+  }
+
+  .fs-icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--color-sunset);
   }
 
   /* ≤1020px: the rail becomes a full-width strip under the board. */

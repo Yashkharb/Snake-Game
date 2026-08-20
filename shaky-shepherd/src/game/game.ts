@@ -155,6 +155,14 @@ const dailyStreakEl = requireElement('daily-streak');
 const copyButton = requireElement<HTMLButtonElement>('copy-button');
 const copyButtonLabel = requireElement('copy-button-label');
 const shareButtonLabel = requireElement('share-button-label');
+const fullscreenButton = requireElement<HTMLButtonElement>('fullscreen-button');
+const fullscreenButtonLabel = requireElement('fullscreen-button-label');
+const startFullscreenButton = requireElement<HTMLButtonElement>('start-fullscreen-button');
+const fsPauseButton = requireElement<HTMLButtonElement>('fs-pause');
+const fsPauseLabel = requireElement('fs-pause-label');
+const fsSoundButton = requireElement<HTMLButtonElement>('fs-sound');
+const fsSoundLabel = requireElement('fs-sound-label');
+const fsExitButton = requireElement<HTMLButtonElement>('fs-exit');
 
 // Crisp rendering on high-density displays while keeping 800×800 logical units.
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -180,11 +188,80 @@ function setMuted(next: boolean) {
   writePreference('audio', muted ? 'off' : 'on');
   soundButton.setAttribute('aria-pressed', String(muted));
   soundButtonLabel.textContent = muted ? 'SOUND OFF' : 'SOUND ON';
+  fsSoundButton.setAttribute('aria-pressed', String(muted));
+  fsSoundLabel.textContent = muted ? 'SOUND OFF' : 'SOUND ON';
   announce(muted ? 'Sound muted' : 'Sound on');
 }
 
 function toggleSound() {
   setMuted(!muted);
+}
+
+// Fullscreen / immersive play. Where the Fullscreen API exists (desktop,
+// Android Chrome, Safari on macOS) the whole document goes truly fullscreen.
+// On platforms without it (iOS Safari does not let arbitrary elements go
+// fullscreen) we still toggle body.is-fullscreen, which the global stylesheet
+// turns into a full-viewport immersive layout — the game gets maximum priority
+// either way. One code path, two mechanisms.
+function isFullscreenActive() {
+  return document.body.classList.contains('is-fullscreen');
+}
+
+function applyFullscreenUI(active: boolean) {
+  document.body.classList.toggle('is-fullscreen', active);
+  fullscreenButton.setAttribute('aria-pressed', String(active));
+  fullscreenButtonLabel.textContent = active ? 'EXIT' : 'FULLSCREEN';
+  fsSoundButton.setAttribute('aria-pressed', String(muted));
+}
+
+function enterFullscreen() {
+  applyFullscreenUI(true);
+  const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+  const request = el.requestFullscreen ?? el.webkitRequestFullscreen;
+  if (request) {
+    try {
+      const result = request.call(el);
+      if (result && typeof (result as Promise<void>).catch === 'function') {
+        (result as Promise<void>).catch(() => {
+          // The API rejected; the immersive CSS class already covers the user.
+        });
+      }
+    } catch {
+      // Immersive class is already applied as the fallback.
+    }
+  }
+}
+
+function exitFullscreen() {
+  applyFullscreenUI(false);
+  const doc = document as Document & { webkitExitFullscreen?: () => void };
+  const request = document.exitFullscreen ?? doc.webkitExitFullscreen;
+  if (request) {
+    try {
+      request.call(document);
+    } catch {
+      // Immersive class is already removed.
+    }
+  }
+}
+
+function toggleFullscreen() {
+  if (isFullscreenActive()) exitFullscreen();
+  else enterFullscreen();
+}
+
+function wireFullscreen() {
+  const syncFromEvent = () => {
+    const doc = document as Document & { webkitFullscreenElement?: Element | null };
+    applyFullscreenUI(Boolean(document.fullscreenElement ?? doc.webkitFullscreenElement));
+  };
+  document.addEventListener('fullscreenchange', syncFromEvent);
+  document.addEventListener('webkitfullscreenchange', syncFromEvent);
+  fullscreenButton.addEventListener('click', toggleFullscreen);
+  startFullscreenButton.addEventListener('click', toggleFullscreen);
+  fsExitButton.addEventListener('click', exitFullscreen);
+  fsPauseButton.addEventListener('click', togglePause);
+  fsSoundButton.addEventListener('click', toggleSound);
 }
 let backgroundCache: OffscreenCanvas | null = null;
 let levelUpFlash = 0;
@@ -463,6 +540,7 @@ function togglePause() {
   pauseButton.innerHTML = pausedNow
     ? '<span class="pause-icon" aria-hidden="true">▶</span><span>RESUME</span><kbd class="keycap" translate="no">P</kbd>'
     : '<span class="pause-icon" aria-hidden="true">Ⅱ</span><span>PAUSE</span><kbd class="keycap" translate="no">P</kbd>';
+  fsPauseLabel.textContent = pausedNow ? 'RESUME' : 'PAUSE';
   if (pausedNow) {
     announce('Game paused.');
     resumeButton.focus();
@@ -1108,6 +1186,10 @@ function wireInput() {
       toggleSound();
       return;
     }
+    if (event.key === 'f' || event.key === 'F') {
+      toggleFullscreen();
+      return;
+    }
     if (DIRECTIONS[event.key]) {
       event.preventDefault();
       setDirection(DIRECTIONS[event.key]);
@@ -1205,6 +1287,7 @@ export function mountGame() {
     }
     prevSnake = game.snake.map(s => ({ ...s }));
     wireInput();
+    wireFullscreen();
     ensureDailyForToday();
     refreshModeUI();
     setModePickerVisible(true);

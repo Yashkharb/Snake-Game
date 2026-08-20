@@ -284,13 +284,66 @@
     }
   }
 
-  /* Touch-first devices: roomier targets, drop keyboard hints. */
-  @media (pointer: coarse) {
-    .btn-pill {
-      min-height: 48px;
-    }
-    .keycap {
-      display: none;
-    }
+/* Touch-first devices: roomier targets, drop keyboard hints. */
+@media (pointer: coarse) {
+  .btn-pill {
+    min-height: 48px;
   }
+  .keycap {
+    display: none;
+  }
+}
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Fullscreen / immersive play — the game takes over the screen.
+   Toggled by the engine via body.is-fullscreen. Uses the native
+   Fullscreen API where available and degrades to a pure-CSS
+   full-viewport mode on platforms without it (e.g. iOS Safari).
+
+   Deliberately unlayered: these rules must out-rank the per-component
+   scoped styles (which Astro injects unlayered), so a single body
+   class can collapse the page down to the board.
+   ───────────────────────────────────────────────────────────── */
+
+body.is-fullscreen {
+  overflow: hidden;
+}
+
+body.is-fullscreen .topbar,
+body.is-fullscreen .hero,
+body.is-fullscreen .seo-content,
+body.is-fullscreen .stat-rail,
+body.is-fullscreen .info-rail,
+body.is-fullscreen .mode-picker,
+body.is-fullscreen .touch-controls,
+body.is-fullscreen footer {
+  display: none;
+}
+
+body.is-fullscreen .game-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  aspect-ratio: auto;
+}
+
+/* Keep the square board centered without distortion; the canvas
+   letterboxes into the full-screen stage. */
+body.is-fullscreen .game-stage canvas {
+  object-fit: contain;
+}
+
+/* Floating in-board controls: visible only while fullscreen is active. */
+body.is-fullscreen .fs-controls {
+  display: flex;
+}
+
+/* The start-screen CTA is pointless once the board already owns the screen. */
+body.is-fullscreen .start-fs-button {
+  display: none;
 }

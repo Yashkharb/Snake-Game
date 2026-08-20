@@ -28,6 +28,9 @@
     <button class="btn-pill btn-pill--primary" id="start-button">
       <span id="start-button-label">Start run</span><kbd class="keycap">Space</kbd>
     </button>
+    <button class="btn-pill btn-pill--secondary start-fs-button" id="start-fullscreen-button" type="button">
+      <span>Play fullscreen</span>
+    </button>
     <p class="control-hint"><span>ARROW KEYS · WASD · SWIPE OR DIRECTION PAD</span></p>
   </div>
 
@@ -92,6 +95,22 @@
         <span id="share-button-label">Share score</span>
       </button>
     </div>
+  </div>
+
+  <div class="fs-controls" role="group" aria-label="Fullscreen controls">
+    <button class="btn-pill fs-btn" id="fs-pause" type="button">
+      <span class="fs-btn-icon" aria-hidden="true">Ⅱ</span>
+      <span id="fs-pause-label" translate="no">PAUSE</span>
+    </button>
+    <button class="btn-pill fs-btn" id="fs-sound" type="button" aria-pressed="false">
+      <span id="fs-sound-label" translate="no">SOUND ON</span>
+    </button>
+    <button class="btn-pill fs-btn" id="fs-exit" type="button">
+      <svg class="fs-btn-icon" aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" />
+      </svg>
+      <span translate="no">EXIT</span>
+    </button>
   </div>
 </section>
 
@@ -320,6 +339,43 @@
     display: none;
   }
 
+  /* Secondary "Play fullscreen" CTA on the start screen. */
+  .start-fs-button {
+    margin-top: 10px;
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+
+  /* Floating controls that appear only in fullscreen mode (display toggled
+     globally via body.is-fullscreen). */
+  .fs-controls {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 7;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .fs-btn {
+    min-height: 40px;
+    padding: 6px 14px;
+    background: rgba(10, 10, 10, 0.72);
+    backdrop-filter: blur(3px);
+  }
+
+  .fs-btn-icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--color-sunset);
+  }
+
+  .fs-btn .fs-btn-icon:first-child {
+    font-size: 14px;
+    line-height: 1;
+  }
+
   h2 {
     margin: 10px 0 10px;
     font-size: clamp(30px, 4vw, 42px);
@@ -534,6 +590,17 @@
     .result-actions .btn-pill {
       width: 100%;
     }
+    .start-fs-button {
+      width: 100%;
+    }
+    .fs-controls {
+      top: 8px;
+      right: 8px;
+    }
+    .fs-btn {
+      min-height: 44px;
+      padding: 6px 12px;
+    }
   }
 
   /* Small portrait screens: roomy primary-action touch targets. */
@@ -565,6 +632,7 @@
     .overlay-best,
     .overlay-streak,
     .control-hint,
+    .start-fs-button,
     .result-grid {
       display: none;
     }
